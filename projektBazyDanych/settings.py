@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app.apps.AppConfig',
+    'app.apps.AppConfig'
 ]
 
 MIDDLEWARE = [
@@ -77,10 +77,15 @@ WSGI_APPLICATION = 'projektBazyDanych.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'portal_ogloszen',  # Nazwa bazy danych
+        'USER': 'django_user',      # Użytkownik bazy danych
+        'PASSWORD': 'adis1337',  # Hasło użytkownika
+        'HOST': 'localhost',        # Host bazy danych
+        'PORT': '3306',             # Port MySQL (domyślnie 3306)
     }
 }
+
 
 
 # Password validation

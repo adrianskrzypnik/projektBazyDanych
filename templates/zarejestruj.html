@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejestracja</title>
+</head>
+<body>
+    <h1>Rejestracja użytkownika</h1>
+    <form method="post" action="/app/zarejestruj/">
+        {% csrf_token %}
+        <label for="nazwa">Nazwa użytkownika:</label><br>
+        <input type="text" id="nazwa" name="nazwa" required><br><br>
+
+        <label for="email">Email:</label><br>
+        <input type="email" id="email" name="email" required><br><br>
+
+        <label for="haslo">Hasło:</label><br>
+        <input type="password" id="haslo" name="haslo" required><br><br>
+
+        <button type="submit">Zarejestruj</button>
+    </form>
+</body>
+</html>
