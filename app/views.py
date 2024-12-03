@@ -52,3 +52,4 @@ def pobierz_uzytkownika(request, user_id):
             return JsonResponse({'error': 'Użytkownik nie znaleziony.'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+#cos
