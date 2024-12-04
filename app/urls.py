@@ -10,6 +10,8 @@ urlpatterns = [
     path('delete_ad/<int:ad_id>', views.usun_ogloszenie, name='delete_ad'),
     path('edit_ad/<int:ad_id>/', views.edytuj_ogloszenie, name='edit_ad'),
     path('discover_ads/', views.przegladaj_ogloszenia, name='discover_ads'),
+    path('add_comment/<int:ad_id>/', views.dodaj_komentarz, name='add_comment'),
+    path('edit_comment/<int:ad_id>/', views.edytuj_komentarz, name='edit_comment'),
 
     # html do testowania funkcji
 
@@ -20,9 +22,11 @@ urlpatterns = [
     path('delete_ad/<int:ad_id>/test', views.usun_ogloszenie_test, name='delete_ad_test'),
     path('edit_ad/<int:ad_id>/test/', views.edytuj_ogloszenie_test, name='edit_ad_test'),
     path('discover_ads/test/', views.przegladaj_ogloszenia_test, name='discover_ads_test'),
+    path('add_comment/<int:ad_id>/test/', views.dodaj_komentarz_test, name='add_comment_test'),
 
     # path('/', views., name=''),
-    # path('/', views., name=''),
+    # path('/', views., name=''),dsadadsada
+
 
 
 

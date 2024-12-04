@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dodaj Komentarz</title>
+</head>
+<body>
+    <h1>Dodaj Komentarz</h1>
+    <form method="post" action="/app/add_comment/{{ ad_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="ad_id" value="{{ ad_id }}">
+        <label for="tresc">Treść komentarza:</label>
+        <textarea id="tresc" name="tresc" required></textarea>
+        <br>
+        <button type="submit">Dodaj Komentarz</button>
+    </form>
+</body>
+</html>

@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.db import connection
 from django.http import JsonResponse
 from datetime import datetime
-
-from django.shortcuts import render
+from django.contrib.auth import authenticate, login
+from django.shortcuts import render, redirect
 from django.db import connection
 from django.http import JsonResponse
 from datetime import datetime
@@ -67,7 +67,7 @@ def zaloguj_uzytkownika(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
-    return render(request, 'login.html')
+
 
 def zaloguj_uzytkownika_test(request):
     return render(request, 'login.html')
@@ -154,7 +154,7 @@ def edytuj_ogloszenie(request, ad_id):
             return JsonResponse({'error': str(e)}, status=500)
 
 def edytuj_ogloszenie_test(request, ad_id):
-    return render(request, 'edit_add.html', {'ad_id': ad_id})
+    return render(request, 'edit_ad.html', {'ad_id': ad_id})
 
 
 def przegladaj_ogloszenia(request):
@@ -208,27 +208,120 @@ def przegladaj_ogloszenia_test(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-def pobierz_uzytkownika(request, user_id):
+
+def dodaj_komentarz(request, ad_id):
+    tresc = request.POST.get('tresc')
+    uzytkownik_id = request.session.get('user_id')
+
     sql = """
-    SELECT user_id, nazwa, email, data_utworzenia
-    FROM users
-    WHERE user_id = %s
+        INSERT INTO comments (ogloszenie_id, uzytkownik_id, tresc, data_utworzenia)
+        VALUES (%s, %s, %s, CURRENT_DATE)
     """
 
     try:
         with connection.cursor() as cursor:
-            cursor.execute(sql, [user_id])
-            row = cursor.fetchone()
-
-        if row:
-            user_data = {
-                'user_id': row[0],
-                'nazwa': row[1],
-                'email': row[2],
-                'data_utworzenia': row[3]
-            }
-            return JsonResponse(user_data, status=200)
-        else:
-            return JsonResponse({'error': 'Użytkownik nie znaleziony.'}, status=404)
+            cursor.execute(sql, [ad_id, uzytkownik_id, tresc])
+        return JsonResponse({'message': 'Dodano komentarz.'}, status=200)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def dodaj_komentarz_test(request, ad_id):
+    return render(request, 'add_comment.html', {'ad_id': ad_id})
+
+
+def edytuj_komentarz(request, comment_id):
+    tresc = request.POST.get('tresc')
+
+    sql = """
+        UPDATE comments
+        SET tresc = %s, data_utworzenia = CURRENT_DATE
+        WHERE comment_id = %s
+    """
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [tresc, comment_id])
+        return JsonResponse({'message': 'Ogłoszenie zostało zaktualizowane.'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)  # Obsługa błędów
+
+def edytuj_komentarz_test(request, ad_id):
+    return render(request, 'add_comment.html', {'comment_id': comment_id})
+
+
+def usun_komentarz(request, comment_id):
+    sql = "DELETE FROM comments WHERE comment_id = %s"
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [comment_id])
+        return JsonResponse({'message': 'Usunięto komentarz.'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def usun_komentarz_test(request, ad_id):
+    return render(request, 'delete_comment.html', {'comment_id': comment_id})
+
+
+def polub_ogloszenie(request, ad_id):
+    uzytkownik_id = request.user.user_id
+
+    sql_check = "SELECT COUNT(*) FROM likes WHERE ogloszenie_id = %s AND uzytkownik_id = %s"
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql_check, [ad_id, uzytkownik_id])
+            result = cursor.fetchone()
+            if result[0] == 0:
+                sql_insert = """
+                    INSERT INTO likes (ogloszenie_id, uzytkownik_id)
+                    VALUES (%s, %s)
+                """
+                cursor.execute(sql_insert, [ad_id, uzytkownik_id])
+
+        return JsonResponse({'message': 'Polubiono ogłoszenie.'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def polub_ogloszenie_test(request, ad_id):
+    return render(request, 'like_ad.html', {'ad_id': ad_id})
+
+
+def usun_polubienie(request, ad_id):
+    uzytkownik_id = request.user.user_id
+
+    sql = "DELETE FROM likes WHERE ogloszenie_id = %s AND uzytkownik_id = %s"
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [ad_id, uzytkownik_id])
+        return JsonResponse({'message': 'Usunięto polubienie ogłoszenia.'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)  # Obsługa błędów
+
+
+def usun_polubienie_test(request, ad_id):
+    return render(request, 'dislike_ad.html', {'comment_id': comment_id})
+
+
+def ocen_uzytkownika(request, oceniany_id):
+    ocena = request.POST.get('ocena')
+    oceniający_id = request.user.user_id
+
+    sql_insert = """
+        INSERT INTO ratings (oceniający_id, oceniany_id, ocena, data_oceny)
+        VALUES (%s, %s, %s, CURRENT_DATE)
+    """
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql_insert, [oceniający_id, oceniany_id, ocena])
+        return JsonResponse({'message': 'Oceniono użytkownika.'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def ocen_uzytkownika_test(request, ad_id):
+    return render(request, 'rate_user.html', {'oceniany_id': oceniany_id})
