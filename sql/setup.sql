@@ -1,10 +1,10 @@
--- CREATE TABLE users (
---     user_id INT AUTO_INCREMENT PRIMARY KEY,
---     nazwa VARCHAR(255) NOT NULL,
---     email VARCHAR(255) NOT NULL,
---     haslo VARCHAR(255) NOT NULL,
---     data_utworzenia DATE
--- );
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    nazwa VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    haslo VARCHAR(255) NOT NULL,
+    data_utworzenia DATE
+);
 
 CREATE TABLE categories (
     category_id INT AUTO_INCREMENT PRIMARY KEY,

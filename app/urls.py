@@ -11,7 +11,7 @@ urlpatterns = [
     path('edit_ad/<int:ad_id>/', views.edytuj_ogloszenie, name='edit_ad'),
     path('discover_ads/', views.przegladaj_ogloszenia, name='discover_ads'),
 
-    #html do testowania funkcji
+    # html do testowania funkcji
 
     path('register/test/', views.zarejestruj_uzytkownika_test, name='register_test'),
     path('login/test/', views.zaloguj_uzytkownika_test, name='login_test'),

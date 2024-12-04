@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Usuń ogłoszenie</title>
+</head>
+<body>
+    <h1>Usuń ogłoszenie</h1>
+    <form method="post" action="/app/delete_ad/{{ ad_id }}/">
+        {% csrf_token %}
+        <p>Czy na pewno chcesz usunąć ogłoszenie?</p>
+        <button type="submit">Tak, usuń</button>
+    </form>
+</body>
+</html>

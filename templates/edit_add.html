@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edytuj ogłoszenie</title>
+</head>
+<body>
+    <h1>Edytuj ogłoszenie</h1>
+    <form method="post" action="{% url 'edit_ad' ad_id=ad_id %}">
+        {% csrf_token %}
+        <label for="tytul">Tytuł:</label>
+        <input type="text" id="tytul" name="tytul" value="{{ ogloszenie.tytul }}" required>
+        <br>
+        <label for="opis">Opis:</label>
+        <textarea id="opis" name="opis">{{ ogloszenie.opis }}</textarea>
+        <br>
+        <label for="cena">Cena:</label>
+        <input type="number" id="cena" name="cena" step="0.01" value="{{ ogloszenie.cena }}">
+        <br>
+        <label for="kategoria_id">Kategoria ID:</label>
+        <input type="number" id="kategoria_id" name="kategoria_id" value="{{ ogloszenie.kategoria_id }}" required>
+        <br>
+        <label for="status">Dostępne:</label>
+        <input type="checkbox" id="status" name="status" {% if ogloszenie.status %}checked{% endif %}>
+        <br>
+        <button type="submit">Zapisz zmiany</button>
+    </form>
+</body>
+</html>

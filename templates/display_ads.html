@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Przeglądaj ogłoszenia</title>
+</head>
+<body>
+    <h1>Przeglądaj ogłoszenia</h1>
+
+    <!-- Formularz filtrowania ogłoszeń -->
+    <form method="GET" action="/app/discover_ads/test">
+        <label for="category">Kategoria:</label>
+        <select name="category" id="category">
+            <option value="">--Wybierz kategorię--</option>
+            <option value="1" {% if request.GET.category == "1" %}selected{% endif %}>Kategoria 1</option>
+            <option value="2" {% if request.GET.category == "2" %}selected{% endif %}>Kategoria 2</option>
+            <option value="3" {% if request.GET.category == "3" %}selected{% endif %}>Kategoria 3</option>
+            <!-- Dodaj inne kategorie według potrzeby -->
+        </select>
+
+        <label for="min_price">Minimalna cena:</label>
+        <input type="number" name="min_price" id="min_price" value="{{ request.GET.min_price }}">
+
+        <label for="max_price">Maksymalna cena:</label>
+        <input type="number" name="max_price" id="max_price" value="{{ request.GET.max_price }}">
+
+        <button type="submit">Filtruj</button>
+    </form>
+
+    <hr>
+
+    <!-- Wyświetlanie ogłoszeń -->
+    <ul>
+        {% for ad in ads %}
+            <li>
+                <h3>{{ ad.tytul }}</h3>
+                <p>{{ ad.opis }}</p>
+                <p>Cena: {{ ad.cena }} PLN</p>
+                <p>Kategoria ID: {{ ad.kategoria_id }}</p>
+                <p>Status: {{ ad.status|yesno:"Dostępne,Niedostępne" }}</p>
+                <p>Użytkownik ID: {{ ad.uzytkownik_id }}</p>
+                <p>Data utworzenia: {{ ad.data_utworzenia }}</p>
+            </li>
+        {% empty %}
+            <p>Brak ogłoszeń spełniających wybrane kryteria.</p>
+        {% endfor %}
+    </ul>
+</body>
+</html>
