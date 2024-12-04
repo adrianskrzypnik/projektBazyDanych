@@ -27,7 +27,6 @@ def zarejestruj_uzytkownika(request):
 
         try:
             with connection.cursor() as cursor:
-                # Sprawdzenie, czy e-mail już istnieje
                 cursor.execute(check_email_sql, [email])
                 email_count = cursor.fetchone()[0]
 
@@ -37,14 +36,12 @@ def zarejestruj_uzytkownika(request):
                         status=400
                     )
 
-                # Jeśli e-mail jest unikalny, dodaj nowego użytkownika
                 cursor.execute(insert_sql, [nazwa, email, haslo, data_utworzenia])
 
             return JsonResponse({'message': 'Użytkownik został zarejestrowany.'}, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
-    return render(request, 'register.html')
 
 def zarejestruj_uzytkownika_test(request):
     return render(request, 'register.html')
@@ -132,7 +129,7 @@ def usun_ogloszenie(request, ad_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 def usun_ogloszenie_test(request, ad_id):
-    return render(request, 'delete_ad_test.html')
+    return render(request, 'delete_ad.html')
 
 
 def edytuj_ogloszenie(request, ad_id):
@@ -161,30 +158,55 @@ def edytuj_ogloszenie_test(request, ad_id):
 
 
 def przegladaj_ogloszenia(request):
+    category_id = request.GET.get('category')
+    min_price = request.GET.get('min_price')
+    max_price = request.GET.get('max_price')
+
     sql = "SELECT * FROM ads WHERE status = True"
+
+    if category_id:
+        sql += f" AND kategoria_id = {category_id}"
+
+    if min_price:
+        sql += f" AND cena >= {min_price}"
+    if max_price:
+        sql += f" AND cena <= {max_price}"
 
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql)
-            ads = cursor.fetchall()
+            columns = [col[0] for col in cursor.description]
+            ads = [dict(zip(columns, ad)) for ad in cursor.fetchall()]
 
         return JsonResponse({'ads': ads}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
 def przegladaj_ogloszenia_test(request):
+    category_id = request.GET.get('category')
+    min_price = request.GET.get('min_price')
+    max_price = request.GET.get('max_price')
+
     sql = "SELECT * FROM ads WHERE status = True"
+
+    if category_id:
+        sql += f" AND kategoria_id = {category_id}"
+
+    if min_price:
+        sql += f" AND cena >= {min_price}"
+    if max_price:
+        sql += f" AND cena <= {max_price}"
 
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql)
-            columns = [col[0] for col in cursor.description]  # Pobierz nazwy kolumn
+            columns = [col[0] for col in cursor.description]
             ads = [dict(zip(columns, ad)) for ad in cursor.fetchall()]
 
         return render(request, 'display_ads.html', {'ads': ads})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-
 
 def pobierz_uzytkownika(request, user_id):
     sql = """

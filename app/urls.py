@@ -23,7 +23,6 @@ urlpatterns = [
 
     # path('/', views., name=''),
     # path('/', views., name=''),
-    # path('/', views., name=''),
 
 
 
