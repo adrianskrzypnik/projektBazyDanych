@@ -6,7 +6,7 @@
 </head>
 <body>
     <h1>Edycja profilu</h1>
-    <form method="post" action="/app/edit_profile/">
+    <form method="post" action="/app/edit_profile/{{ user_id }}/">
         {% csrf_token %}
         <label for="nazwa">Nazwa użytkownika:</label>
         <input type="text" id="nazwa" name="nazwa" required>

@@ -8,8 +8,7 @@
     <h1>Usuń ogłoszenie</h1>
     <form method="post" action="/app/delete_ad/{{ ad_id }}/">
         {% csrf_token %}
-        <p>Czy na pewno chcesz usunąć ogłoszenie?</p>
-        <button type="submit">Tak, usuń</button>
+        <button type="submit">Usuń</button>
     </form>
 </body>
 </html>

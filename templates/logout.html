@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wylogowanie</title>
+</head>
+<body>
+    <h1>Wylogowanie</h1>
+    <form method="post" action="/app/logout/">
+        {% csrf_token %}
+        <button type="submit">Wyloguj</button>
+    </form>
+</body>
+</html>

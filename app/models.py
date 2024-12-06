@@ -35,11 +35,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     data_utworzenia = models.DateField(auto_now_add=True)
 
-    # Pola wymagane przez Django
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
-    # Pola wymagane przez AbstractBaseUser
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nazwa']
 

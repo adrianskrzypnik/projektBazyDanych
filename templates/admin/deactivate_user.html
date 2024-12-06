@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dezaktywacja Użytkownika</title>
+</head>
+<body>
+    <h1>Dezaktywacja Użytkownika</h1>
+    <form method="post" action="/app/deactivate_user/{{ user_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="user_id" value="{{ user_id }}">
+
+        <button type="submit">Dezaktywuj Użytkownika</button>
+    </form>
+</body>
+</html>

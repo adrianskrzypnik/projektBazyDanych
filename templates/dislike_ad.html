@@ -9,7 +9,6 @@
     <form method="post" action="/app/dislike_ad/{{ ad_id }}/">
         {% csrf_token %}
         <input type="hidden" name="ad_id" value="{{ ad_id }}">
-        <p>Czy chcesz usunąć polubienie tego ogłoszenia?</p>
         <button type="submit">Usuń Polubienie</button>
     </form>
 </body>

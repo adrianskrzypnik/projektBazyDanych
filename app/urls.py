@@ -5,9 +5,10 @@ urlpatterns = [
     #funckje api
     path('register/', views.zarejestruj_uzytkownika, name='register'),
     path('login/', views.zaloguj_uzytkownika, name='login'),
-    path('edit_profile/', views.edytuj_profil, name='edit_profile'),
+    path('logout/', views.wyloguj_uzytkownika, name='logout'),
+    path('edit_profile/<int:user_id>/', views.edytuj_profil, name='edit_profile'),
     path('add_ad/', views.dodaj_ogloszenie, name='add_ad'),
-    path('delete_ad/<int:ad_id>', views.usun_ogloszenie, name='delete_ad'),
+    path('delete_ad/<int:ad_id>/', views.usun_ogloszenie, name='delete_ad'),
     path('edit_ad/<int:ad_id>/', views.edytuj_ogloszenie, name='edit_ad'),
     path('discover_ads/', views.przegladaj_ogloszenia, name='discover_ads'),
     path('add_comment/<int:ad_id>/', views.dodaj_komentarz, name='add_comment'),
@@ -16,14 +17,19 @@ urlpatterns = [
     path('like_ad/<int:ad_id>/', views.polub_ogloszenie, name='like_ad'),
     path('dislike_ad/<int:ad_id>/', views.usun_polubienie, name='dislike_ad'),
     path('rate_user/<int:oceniany_id>/', views.ocen_uzytkownika, name='rate_user'),
-
-    # html do testowania funkcji
+    path('deactivate_user/<int:user_id>/', views.dezaktywuj_uzytkownika, name='deactivate_user'),
+    path('activate_user/<int:user_id>/', views.aktywuj_uzytkownika, name='activate_user'),
+    path('add_category/', views.stworz_kategorie, name='add_category'),
+    path('edit_category/<int:category_id>/', views.edytuj_kategorie, name='edit_category'),
+    path('delete_category/<int:category_id>/', views.usun_kategorie, name='delete_category'),
+    # html do testowania funkcjidsad
 
     path('register/test/', views.zarejestruj_uzytkownika_test, name='register_test'),
     path('login/test/', views.zaloguj_uzytkownika_test, name='login_test'),
-    path('edit_profile/test/', views.edytuj_profil_test, name='edit_profile_test'),
+    path('logout/test/', views.wyloguj_uzytkownika_test, name='logout_test'),
+    path('edit_profile/<int:user_id>/test/', views.edytuj_profil_test, name='edit_profile_test'),
     path('add_ad/test/', views.dodaj_ogloszenie_test, name='add_ad_test'),
-    path('delete_ad/<int:ad_id>/test', views.usun_ogloszenie_test, name='delete_ad_test'),
+    path('delete_ad/<int:ad_id>/test/', views.usun_ogloszenie_test, name='delete_ad_test'),
     path('edit_ad/<int:ad_id>/test/', views.edytuj_ogloszenie_test, name='edit_ad_test'),
     path('discover_ads/test/', views.przegladaj_ogloszenia_test, name='discover_ads_test'),
     path('add_comment/<int:ad_id>/test/', views.dodaj_komentarz_test, name='add_comment_test'),
@@ -32,6 +38,10 @@ urlpatterns = [
     path('like_ad/<int:ad_id>/test/', views.polub_ogloszenie_test, name='like_ad_test'),
     path('dislike_ad/<int:ad_id>/test/', views.usun_polubienie_test, name='dislike_ad_test'),
     path('rate_user/<int:oceniany_id>/test/', views.ocen_uzytkownika_test, name='rate_user_test'),
-
+    path('deactivate_user/<int:user_id>/test/', views.dezaktywuj_uzytkownika_test, name='deactivate_user_test'),
+    path('activate_user/<int:user_id>/test/', views.aktywuj_uzytkownika_test, name='activate_user_test'),
+    path('add_category/test/', views.stworz_kategorie_test, name='add_category_test'),
+    path('edit_category/<int:category_id>/test/', views.edytuj_kategorie_test, name='edit_category_test'),
+    path('delete_category/<int:category_id>/test/', views.usun_kategorie_test, name='delete_category_test'),
 
 ]

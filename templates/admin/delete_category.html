@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuń Kategorię</title>
+</head>
+<body>
+    <h1>Usuń Kategorię</h1>
+
+    <form method="post" action="/app/delete_category/{{ category_id }}/">
+        {% csrf_token %}
+
+        <button type="submit">Usuń Kategorię</button>
+    </form>
+
+
+</body>
+</html>
