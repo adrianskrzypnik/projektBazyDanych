@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Usuń Komentarz</title>
+</head>
+<body>
+    <h1>Usuń Komentarz</h1>
+    <form method="post" action="/app/delete_comment/{{ comment_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="comment_id" value="{{ comment_id }}">
+        <p>Czy na pewno chcesz usunąć ten komentarz?</p>
+        <button type="submit">Potwierdź Usunięcie</button>
+    </form>
+</body>
+</html>

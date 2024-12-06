@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Oceń Użytkownika</title>
+</head>
+<body>
+    <h1>Oceń Użytkownika</h1>
+    <form method="post" action="/app/rate_user/{{ oceniany_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="oceniany_id" value="{{ oceniany_id }}">
+        <label for="ocena">Wybierz ocenę:</label>
+        <select id="ocena" name="ocena" required>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+        </select>
+        <br>
+        <button type="submit">Wyślij Ocenę</button>
+    </form>
+</body>
+</html>

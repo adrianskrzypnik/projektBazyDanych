@@ -96,7 +96,6 @@ class Like(models.Model):
     like_id = models.AutoField(primary_key=True)
     ogloszenie = models.ForeignKey(Ad, on_delete=models.CASCADE)
     uzytkownik = models.ForeignKey(User, on_delete=models.CASCADE)
-    polubiony_przez = models.IntegerField()
 
     class Meta:
         managed = False

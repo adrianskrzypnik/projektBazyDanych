@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Polub Ogłoszenie</title>
+</head>
+<body>
+    <h1>Polub Ogłoszenie</h1>
+    <form method="post" action="/app/like_ad/{{ ad_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="ad_id" value="{{ ad_id }}">
+        <p>Czy chcesz polubić to ogłoszenie?</p>
+        <button type="submit">Polub</button>
+    </form>
+</body>
+</html>

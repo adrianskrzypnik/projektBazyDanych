@@ -242,12 +242,12 @@ def edytuj_komentarz(request, comment_id):
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql, [tresc, comment_id])
-        return JsonResponse({'message': 'Ogłoszenie zostało zaktualizowane.'}, status=200)
+        return JsonResponse({'message': 'Komentarz został zaktualizowany.'}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)  # Obsługa błędów
 
-def edytuj_komentarz_test(request, ad_id):
-    return render(request, 'add_comment.html', {'comment_id': comment_id})
+def edytuj_komentarz_test(request, comment_id):
+    return render(request, 'edit_comment.html', {'comment_id': comment_id})
 
 
 def usun_komentarz(request, comment_id):
@@ -261,12 +261,13 @@ def usun_komentarz(request, comment_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-def usun_komentarz_test(request, ad_id):
+def usun_komentarz_test(request, comment_id):
     return render(request, 'delete_comment.html', {'comment_id': comment_id})
 
 
 def polub_ogloszenie(request, ad_id):
-    uzytkownik_id = request.user.user_id
+    uzytkownik_id = request.session.get('user_id')
+    user_id = request.session.get('user_id')
 
     sql_check = "SELECT COUNT(*) FROM likes WHERE ogloszenie_id = %s AND uzytkownik_id = %s"
 
@@ -291,7 +292,7 @@ def polub_ogloszenie_test(request, ad_id):
 
 
 def usun_polubienie(request, ad_id):
-    uzytkownik_id = request.user.user_id
+    uzytkownik_id = request.session.get('user_id')
 
     sql = "DELETE FROM likes WHERE ogloszenie_id = %s AND uzytkownik_id = %s"
 
@@ -304,24 +305,24 @@ def usun_polubienie(request, ad_id):
 
 
 def usun_polubienie_test(request, ad_id):
-    return render(request, 'dislike_ad.html', {'comment_id': comment_id})
+    return render(request, 'dislike_ad.html', {'ad_id': ad_id})
 
 
 def ocen_uzytkownika(request, oceniany_id):
     ocena = request.POST.get('ocena')
-    oceniający_id = request.user.user_id
+    oceniajacy_id = request.session.get('user_id')
 
     sql_insert = """
-        INSERT INTO ratings (oceniający_id, oceniany_id, ocena, data_oceny)
+        INSERT INTO ratings (oceniajacy_id, oceniany_id, ocena, data_oceny)
         VALUES (%s, %s, %s, CURRENT_DATE)
     """
 
     try:
         with connection.cursor() as cursor:
-            cursor.execute(sql_insert, [oceniający_id, oceniany_id, ocena])
+            cursor.execute(sql_insert, [oceniajacy_id, oceniany_id, ocena])
         return JsonResponse({'message': 'Oceniono użytkownika.'}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-def ocen_uzytkownika_test(request, ad_id):
+def ocen_uzytkownika_test(request, oceniany_id):
     return render(request, 'rate_user.html', {'oceniany_id': oceniany_id})

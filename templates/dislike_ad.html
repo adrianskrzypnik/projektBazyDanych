@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Usuń Polubienie</title>
+</head>
+<body>
+    <h1>Usuń Polubienie</h1>
+    <form method="post" action="/app/dislike_ad/{{ ad_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="ad_id" value="{{ ad_id }}">
+        <p>Czy chcesz usunąć polubienie tego ogłoszenia?</p>
+        <button type="submit">Usuń Polubienie</button>
+    </form>
+</body>
+</html>

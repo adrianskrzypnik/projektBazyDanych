@@ -38,17 +38,16 @@ CREATE TABLE likes (
     like_id INT AUTO_INCREMENT PRIMARY KEY,
     ogloszenie_id INT,
     uzytkownik_id INT,
-    polubiony_przez INT,
     FOREIGN KEY (ogloszenie_id) REFERENCES ads(ad_id),
     FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
 );
 
 CREATE TABLE ratings (
     rating_id INT AUTO_INCREMENT PRIMARY KEY,
-    oceniający_id INT,
+    oceniajacy_id INT,
     oceniany_id INT,
     ocena INT,
     data_oceny DATE,
-    FOREIGN KEY (oceniający_id) REFERENCES users(user_id),
+    FOREIGN KEY (oceniajacy_id) REFERENCES users(user_id),
     FOREIGN KEY (oceniany_id) REFERENCES users(user_id)
 );
