@@ -2,16 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dodaj Komentarz</title>
 </head>
 <body>
     <h1>Dodaj Komentarz</h1>
-    <form method="post" action="/app/add_comment/{{ ad_id }}/">
+    <form method="post" action="/app/add_comment/">
         {% csrf_token %}
-        <input type="hidden" name="ad_id" value="{{ ad_id }}">
-        <label for="tresc">Treść komentarza:</label>
-        <textarea id="tresc" name="tresc" required></textarea>
-        <br>
+
+        <!-- Wybór typu komentarza -->
+        <label for="type">Typ komentarza:</label>
+        <select id="type" name="type" required>
+            <option value="ad">Ogłoszenie</option>
+            <option value="user">Profil użytkownika</option>
+        </select>
+        <br><br>
+
+        <!-- Pole ID (ogłoszenia lub użytkownika) -->
+        <label for="id">ID celu (ogłoszenie/użytkownik):</label>
+        <input type="number" id="id" name="id" required>
+        <br><br>
+
+        <!-- Treść komentarza -->
+        <label for="content">Treść komentarza:</label>
+        <textarea id="content" name="content" rows="4" cols="50" required></textarea>
+        <br><br>
+
+        <!-- Przycisk dodawania -->
         <button type="submit">Dodaj Komentarz</button>
     </form>
 </body>

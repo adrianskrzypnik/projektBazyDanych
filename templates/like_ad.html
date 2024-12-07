@@ -2,15 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Polub Ogłoszenie</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodaj Polubienie</title>
 </head>
 <body>
-    <h1>Polub Ogłoszenie</h1>
-    <form method="post" action="/app/like_ad/{{ ad_id }}/">
+    <h1>Dodaj Polubienie</h1>
+    <form method="post" action="/app/like/">
         {% csrf_token %}
-        <input type="hidden" name="ad_id" value="{{ ad_id }}">
-        <p>Czy chcesz polubić to ogłoszenie?</p>
-        <button type="submit">Polub</button>
+
+        <!-- Wybór typu polubienia -->
+        <label for="type">Typ polubienia:</label>
+        <select id="type" name="type" required>
+            <option value="ad">Ogłoszenie</option>
+            <option value="user">Profil użytkownika</option>
+        </select>
+        <br><br>
+
+        <!-- Pole ID (ogłoszenia lub użytkownika) -->
+        <label for="id">ID celu (ogłoszenie/użytkownik):</label>
+        <input type="number" id="id" name="id" required>
+        <br><br>
+
+        <!-- Przycisk dodawania -->
+        <button type="submit">Dodaj Polubienie</button>
     </form>
 </body>
 </html>

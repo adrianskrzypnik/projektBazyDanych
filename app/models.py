@@ -82,7 +82,7 @@ class Ad(models.Model):
 class Comment(models.Model):
     comment_id = models.AutoField(primary_key=True)
     ogloszenie = models.ForeignKey(Ad, on_delete=models.CASCADE)
-    uzytkownik = models.ForeignKey(User, on_delete=models.CASCADE)
+    uzytkownik = models.ForeignKey(User, on_delete=models.CASCADE)#uzytkownik ktory dal komentarz
     tresc = models.TextField()
     data_utworzenia = models.DateField()
 
@@ -93,7 +93,7 @@ class Comment(models.Model):
 class Like(models.Model):
     like_id = models.AutoField(primary_key=True)
     ogloszenie = models.ForeignKey(Ad, on_delete=models.CASCADE)
-    uzytkownik = models.ForeignKey(User, on_delete=models.CASCADE)
+    uzytkownik = models.ForeignKey(User, on_delete=models.CASCADE)#uzytkownik ktory dal polubienie
 
     class Meta:
         managed = False

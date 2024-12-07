@@ -34,12 +34,34 @@ CREATE TABLE comments (
     FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
 );
 
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id INT NOT NULL,
+    target_type VARCHAR(10) NOT NULL CHECK (target_type IN ('ad', 'user')),
+    ad_id INT NULL,
+    target_user_id INT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (ad_id) REFERENCES ads(ad_id),
+    FOREIGN KEY (target_user_id) REFERENCES users(user_id),
+    CONSTRAINT target_check CHECK (
+        (ad_id IS NOT NULL AND target_user_id IS NULL AND target_type = 'ad') OR
+        (ad_id IS NULL AND target_user_id IS NOT NULL AND target_type = 'user')
+    )
+);
+
+
 CREATE TABLE likes (
-    like_id INT AUTO_INCREMENT PRIMARY KEY,
-    ogloszenie_id INT,
-    uzytkownik_id INT,
-    FOREIGN KEY (ogloszenie_id) REFERENCES ads(ad_id),
-    FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,  -- użytkownik, który daje polubienie
+    target_type VARCHAR(10) NOT NULL CHECK (target_type IN ('ad', 'user')),
+    ad_id INT NULL,
+    target_user_id INT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (ad_id) REFERENCES ads(ad_id),
+    FOREIGN KEY (target_user_id) REFERENCES users(user_id),
+    UNIQUE(user_id, target_type, ad_id, target_user_id)
 );
 
 CREATE TABLE ratings (

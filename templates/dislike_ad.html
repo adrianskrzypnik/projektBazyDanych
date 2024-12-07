@@ -6,10 +6,11 @@
 </head>
 <body>
     <h1>Usuń Polubienie</h1>
-    <form method="post" action="/app/dislike_ad/{{ ad_id }}/">
+    <form method="post" action="/app/dislike/{{ like_id }}/">
         {% csrf_token %}
-        <input type="hidden" name="ad_id" value="{{ ad_id }}">
-        <button type="submit">Usuń Polubienie</button>
+        <input type="hidden" name="like_id" value="{{ like_id }}">
+        <p>Czy na pewno chcesz usunąć ten like?</p>
+        <button type="submit">Potwierdź Usunięcie</button>
     </form>
 </body>
 </html>
