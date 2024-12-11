@@ -2,7 +2,7 @@ CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     nazwa VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
+    haslo VARCHAR(255) NOT NULL,
     data_utworzenia DATE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     is_staff BOOLEAN DEFAULT FALSE
