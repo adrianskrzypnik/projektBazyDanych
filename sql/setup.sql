@@ -31,8 +31,6 @@ CREATE TABLE ads (
     comments_count INT
 );
 
-
-
 CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
@@ -53,7 +51,7 @@ CREATE TABLE comments (
 
 CREATE TABLE likes (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NOT NULL,  -- użytkownik, który daje polubienie
     target_type VARCHAR(10) NOT NULL CHECK (target_type IN ('ad', 'user')),
     ad_id INT NULL,
     target_user_id INT NULL,
