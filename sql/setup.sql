@@ -5,7 +5,9 @@ CREATE TABLE users (
     haslo VARCHAR(255) NOT NULL,
     data_utworzenia DATE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
-    is_staff BOOLEAN DEFAULT FALSE
+    is_staff BOOLEAN DEFAULT FALSE,
+    likes_received_count  INT,
+    comments_received_count  INT
 );
 
 
@@ -24,7 +26,9 @@ CREATE TABLE ads (
     status BOOLEAN DEFAULT TRUE,
     data_utworzenia DATE,
     FOREIGN KEY (kategoria_id) REFERENCES categories(category_id),
-    FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
+    FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id),
+    likes_count INT,
+    comments_count INT
 );
 
 CREATE TABLE comments (
