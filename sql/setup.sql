@@ -31,15 +31,7 @@ CREATE TABLE ads (
     comments_count INT
 );
 
-CREATE TABLE comments (
-    comment_id INT AUTO_INCREMENT PRIMARY KEY,
-    ogloszenie_id INT,
-    uzytkownik_id INT,
-    tresc TEXT,
-    data_utworzenia DATE,
-    FOREIGN KEY (ogloszenie_id) REFERENCES ads(ad_id),
-    FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
-);
+
 
 CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
@@ -61,7 +53,7 @@ CREATE TABLE comments (
 
 CREATE TABLE likes (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,  -- użytkownik, który daje polubienie
+    user_id INT NOT NULL,
     target_type VARCHAR(10) NOT NULL CHECK (target_type IN ('ad', 'user')),
     ad_id INT NULL,
     target_user_id INT NULL,

@@ -467,58 +467,51 @@ def przegladaj_ogloszenia_test(request):
 
 
 
-def dodaj_komentarz(request):
-    ip_address = request.META.get('REMOTE_ADDR', '')
-    """
-    Funkcja dodawania komentarzy z użyciem raw SQL.
-    Obsługuje zarówno komentarze do ogłoszeń, jak i do profili użytkowników.
-    """
-    # Pobranie danych z requesta
-    typ = request.POST.get('type')
-    element_id = request.POST.get('id')  # ID ogłoszenia lub użytkownika
-    tresc = request.POST.get('content')  # Treść komentarza
-    user_id = request.session.get('user_id')  # ID zalogowanego użytkownika
 
-    # Walidacja danych
+def dodaj_komentarz(request):
+    """
+        Funkcja dodawania komentarzy z użyciem raw SQL.
+        Obsługuje zarówno komentarze do ogłoszeń, jak i do profili użytkowników.
+    """
+    ip_address = request.META.get('REMOTE_ADDR', '')
+    typ = request.POST.get('type')
+    element_id = request.POST.get('id')
+    tresc = request.POST.get('content')
+    user_id = request.session.get('user_id')
+
     if not typ or typ not in ['ad', 'user']:
         return JsonResponse({'error': 'Pole "type" musi być ustawione na "ad" lub "user".'}, status=400)
-
     if not element_id:
         return JsonResponse({'error': 'Pole "id" jest wymagane.'}, status=400)
-
     if not tresc or tresc.strip() == '':
         return JsonResponse({'error': 'Treść komentarza nie może być pusta.'}, status=400)
 
     try:
         with connection.cursor() as cursor:
-            # Pobieranie adresu e-mail użytkownika
-            cursor.execute("SELECT email FROM users WHERE user_id = %s", [user_id])
-            user_email = cursor.fetchone()[0]
-
             if typ == 'ad':
                 sql = """
-                        INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
-                        VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
-                    """
+                    INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
+                    VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
+                """
+                cursor.execute(sql, [tresc, user_id, element_id])
+
+                cursor.execute("UPDATE ads SET comments_count = comments_count + 1 WHERE ad_id = %s", [element_id])
+
             elif typ == 'user':
                 sql = """
-                        INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
-                        VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
-                    """
-            params = [tresc, user_id, element_id]
+                    INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
+                    VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
+                """
+                cursor.execute(sql, [tresc, user_id, element_id])
 
-            # Wykonanie zapytania
-            cursor.execute(sql, params)
-
-            # Zapis loga o dodaniu komentarza
-            ip_address = request.META.get('REMOTE_ADDR', '')
-            zapisz_log(user_email, 'DODANIE_KOMENTARZA', f'Dodano komentarz do {typ} ID: {element_id}', ip_address)
+                # Aktualizacja licznika komentarzy w tabeli użytkowników
+                cursor.execute(
+                    "UPDATE users SET comments_received_count = comments_received_count + 1 WHERE user_id = %s",
+                    [element_id])
 
         return JsonResponse({'message': 'Komentarz został dodany.'}, status=200)
 
     except Exception as e:
-        # Zapis loga o błędzie dodawania komentarza
-        zapisz_log(user_email, 'DODANIE_KOMENTARZA_BŁĄD', f'Błąd dodawania komentarza do {typ} ID: {element_id}, {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -529,7 +522,6 @@ def dodaj_komentarz_test(request):
 
 
 def edytuj_komentarz(request, comment_id):
-    ip_address = request.META.get('REMOTE_ADDR', '')
     '''
     User moze edytowac tylko swoje komentarze. Admin moze edytowac każdy komentarz. Treść nie może być pusta.
     '''
@@ -575,6 +567,7 @@ def edytuj_komentarz(request, comment_id):
                 """
                 cursor.execute(sql, [tresc, comment_id])
 
+
             # Zapis loga o edytowaniu komentarza
             ip_address = request.META.get('REMOTE_ADDR', '')
             zapisz_log(email, 'EDYCJA_KOMENTARZA', f'Zaktualizowano komentarz ID: {comment_id}', ip_address)
@@ -593,7 +586,7 @@ def edytuj_komentarz_test(request, comment_id):
 
 def usun_komentarz(request, comment_id):
     '''
-    User moze usuwać tylko swoje komentarze. Admin moze usunąć każdy komentarz.
+    User może usuwać tylko swoje komentarze. Admin może usunąć każdy komentarz.
     '''
     user_id = request.session.get('user_id')
     if not user_id:
@@ -611,17 +604,31 @@ def usun_komentarz(request, comment_id):
             email = result[1]
 
             cursor.execute("""
-                SELECT user_id 
+                SELECT * 
                 FROM comments 
                 WHERE id = %s
             """, [comment_id])
             comment_owner = cursor.fetchone()
+            print(comment_owner)
 
             if not comment_owner:
                 return JsonResponse({'error': 'Komentarz nie istnieje.'}, status=404)
 
-            if comment_owner[0] != user_id and not is_admin:
+            if comment_owner[1] != user_id and not is_admin:  # Sprawdzenie właściciela komentarza
                 return JsonResponse({'error': 'Brak uprawnień do usunięcia tego komentarza.'}, status=403)
+
+            # Sprawdzanie typu komentarza
+            if comment_owner[4] == 'ad':
+                element_id = comment_owner[5]  # ad_id
+                cursor.execute(
+                    "UPDATE ads SET comments_count = comments_count - 1 WHERE ad_id = %s",
+                    [element_id])
+
+            elif comment_owner[4] == 'user':
+                element_id = comment_owner[6]  # target_user_id
+                cursor.execute(
+                    "UPDATE users SET comments_received_count = comments_received_count - 1 WHERE user_id = %s",
+                    [element_id])
 
             # Usuwanie komentarza
             cursor.execute("DELETE FROM comments WHERE id = %s", [comment_id])
@@ -636,6 +643,7 @@ def usun_komentarz(request, comment_id):
         # Zapis loga o błędzie usunięcia komentarza
         zapisz_log(email, 'USUNIĘCIE_KOMENTARZA_BŁĄD', f'Błąd usunięcia komentarza ID: {comment_id}, {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
+
 
 
 
@@ -687,6 +695,7 @@ def polub(request):
             VALUES (%s, 'ad', %s)
         """
         params = [user_id, element_id]
+        update_likes_count = "UPDATE ads SET likes_count = likes_count + 1 WHERE ad_id = %s"
     elif typ == 'user':
         sql_check = """
             SELECT COUNT(*) FROM likes 
@@ -699,6 +708,7 @@ def polub(request):
             VALUES (%s, 'user', %s)
         """
         params = [user_id, element_id]
+        update_likes_count = "UPDATE users SET likes_received_count = likes_received_count + 1 WHERE user_id = %s"
 
     try:
         with connection.cursor() as cursor:
@@ -707,6 +717,7 @@ def polub(request):
 
             if result[0] == 0:
                 cursor.execute(sql_insert, params)
+                cursor.execute(update_likes_count, [element_id])
                 zapisz_log(email, 'POLUBIENIE_SUKCES',
                            f'Polubiono {"ogłoszenie" if typ == "ad" else "profil"} {element_id}', ip_address)
                 return JsonResponse({'message': f'Dodano polubienie {"ogłoszenia" if typ == "ad" else "profilu"}'},
@@ -723,12 +734,15 @@ def polub(request):
 
 
 
+
+
+
 def polub_test(request):
     return render(request, 'like_ad.html')
 
 def usun_polubienie(request, like_id):
     '''
-    User moze usuwać tylko swoje polubienia. Admin moze usunąć każde polubienie.
+    User może usuwać tylko swoje polubienia. Admin może usunąć każde polubienie.
     '''
     user_id = request.session.get('user_id')
     ip_address = request.META.get('REMOTE_ADDR', '')
@@ -755,21 +769,29 @@ def usun_polubienie(request, like_id):
             is_admin = result[0]
 
             cursor.execute("""
-                SELECT user_id 
+                SELECT user_id, target_type, ad_id, target_user_id 
                 FROM likes 
                 WHERE id = %s
             """, [like_id])
-            comment_owner = cursor.fetchone()
+            like_data = cursor.fetchone()
 
-            if not comment_owner:
+            if not like_data:
                 zapisz_log(email, 'USUNIĘCIE_POLUBIENIA_BŁĄD', 'Like nie istnieje', ip_address)
                 return JsonResponse({'error': 'Like nie istnieje.'}, status=404)
 
-            if comment_owner[0] != user_id and not is_admin:
+            # Sprawdzamy, czy użytkownik ma prawo usunąć to polubienie
+            if like_data[0] != user_id and not is_admin:
                 zapisz_log(email, 'USUNIĘCIE_POLUBIENIA_BŁĄD', 'Brak uprawnień do usunięcia tego like.', ip_address)
                 return JsonResponse({'error': 'Brak uprawnień do usunięcia tego like.'}, status=403)
 
+            # Usuwamy polubienie
             cursor.execute("DELETE FROM likes WHERE id = %s", [like_id])
+
+            # Aktualizujemy liczniki
+            if like_data[1] == 'ad':  # Polubienie ogłoszenia
+                cursor.execute("UPDATE ads SET likes_count = likes_count - 1 WHERE ad_id = %s", [like_data[2]])
+            elif like_data[1] == 'user':  # Polubienie użytkownika
+                cursor.execute("UPDATE users SET likes_received_count = likes_received_count - 1 WHERE user_id = %s", [like_data[3]])
 
         zapisz_log(email, 'USUNIĘCIE_POLUBIENIA_SUKCES', f'Usunięto polubienie {like_id}', ip_address)
         return JsonResponse({'message': 'Likes został usunięty.'}, status=200)
@@ -1033,7 +1055,6 @@ def usun_kategorie(request, category_id):
 def usun_kategorie_test(request, category_id):
     return render(request, 'admin/delete_category.html', {'category_id': category_id})
 
-#test
 @admin_required
 def pokaz_logi(request):
     '''
