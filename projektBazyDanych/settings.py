@@ -57,19 +57,19 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates']
         ,
-        'APP_DIRS': True,
+        'APP_DIRS': False,               #szablony do funkcjonalności
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.debug',                 #debug
+                'django.template.context_processors.request',               #prośby
+                'django.contrib.auth.context_processors.auth',              #autoryzacja
+                'django.contrib.messages.context_processors.messages',      #wiadomosci
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'projektBazyDanych.wsgi.application'
+WSGI_APPLICATION = 'projektBazyDanych.wsgi.application'     #Ścieżka do pliku obsłogującego WSGI (serwer aplikacji)
 
 
 # Database
@@ -80,7 +80,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'portal_ogloszen',  # Nazwa bazy danych
         'USER': 'django_user',      # Użytkownik bazy danych
-        'PASSWORD': 'adis1337',  # Hasło użytkownika
+        'PASSWORD': 'adis1337',     # Hasło użytkownika
         'HOST': 'localhost',        # Host bazy danych
         'PORT': '3306',             # Port MySQL (domyślnie 3306)
     }
@@ -113,9 +113,9 @@ LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
 
-USE_I18N = True
+USE_I18N = True         #Obsługa internacjonalizacji
 
-USE_TZ = True
+USE_TZ = True           # Obsługa stref czasowych
 
 
 # Static files (CSS, JavaScript, Images)
