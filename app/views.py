@@ -1033,10 +1033,11 @@ def usun_kategorie(request, category_id):
 def usun_kategorie_test(request, category_id):
     return render(request, 'admin/delete_category.html', {'category_id': category_id})
 
+#test
 @admin_required
 def pokaz_logi(request):
     '''
-    Funkcja wyświetlania logów dla staff'u
+    Funkcja wyświetlania logów dla staff'u, test
     '''
     sql = "SELECT * FROM logs ORDER BY timestamp DESC LIMIT 100"
 
