@@ -669,6 +669,7 @@ def stworz_kategorie(request):
     user_id = request.session.get('user_id')
     try:
         with connection.cursor() as cursor:
+            # Sprawdzenie, czy użytkownik ma uprawnienia administracyjne
             cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
             result = cursor.fetchone()
 
@@ -689,8 +690,17 @@ def stworz_kategorie(request):
 
             try:
                 with connection.cursor() as cursor:
+                    # Sprawdzenie, czy kategoria już istnieje
+                    cursor.execute("SELECT COUNT(*) FROM categories WHERE nazwa = %s", [nazwa])
+                    category_exists = cursor.fetchone()[0] > 0
+
+                    if category_exists:
+                        return JsonResponse({'error': 'Kategoria o podanej nazwie już istnieje.'}, status=400)
+
+                    # Jeśli kategoria nie istnieje, dodaj ją do bazy danych
                     sql = "INSERT INTO categories (nazwa) VALUES (%s)"
                     cursor.execute(sql, [nazwa])
+
                 return JsonResponse({'message': 'Kategoria została pomyślnie utworzona.'}, status=200)
             except Exception as e:
                 return JsonResponse({'error': str(e)}, status=400)
@@ -699,6 +709,7 @@ def stworz_kategorie(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 def stworz_kategorie_test(request):
     return render(request, 'admin/add_category.html')
