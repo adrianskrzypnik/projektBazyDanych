@@ -6,7 +6,6 @@ def is_admin(user_id):
     """
     Sprawdza w bazie danych, czy użytkownik ma uprawnienia administratora, używając raw SQL.
     """
-    print(user_id)
     if not user_id:
         return False
 
@@ -15,7 +14,6 @@ def is_admin(user_id):
         with connection.cursor() as cursor:
             cursor.execute(sql, [user_id])
             result = cursor.fetchone()
-            print(result)
             if result:
                 return result[0]  # Zwraca True, jeśli is_staff = 1
             return False

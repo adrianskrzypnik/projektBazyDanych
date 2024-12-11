@@ -76,3 +76,12 @@ CREATE TABLE ratings (
     FOREIGN KEY (oceniajacy_id) REFERENCES users(user_id),
     FOREIGN KEY (oceniany_id) REFERENCES users(user_id)
 );
+
+CREATE TABLE logs (
+    id SERIAL PRIMARY KEY,
+    user_email VARCHAR(255),
+    action VARCHAR(100),
+    details TEXT,
+    ip_address VARCHAR(45),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
