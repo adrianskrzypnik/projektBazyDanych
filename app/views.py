@@ -806,27 +806,55 @@ def usun_polubienie_test(request, like_id):
     return render(request, 'dislike_ad.html', {'like_id': like_id})
 
 
+
 def ocen_uzytkownika(request, oceniany_id):
     ocena = request.POST.get('ocena')
     oceniajacy_id = request.session.get('user_id')
     ip_address = request.META.get('REMOTE_ADDR', '')
     email = ''
 
+    if not oceniajacy_id:
+        zapisz_log('Brak_email', 'OCENA_BŁĄD', 'Brak zalogowanego użytkownika', ip_address)
+        return JsonResponse({'error': 'Użytkownik niezalogowany.'}, status=401)
+
     try:
         with connection.cursor() as cursor:
+            # Sprawdzamy email oceniajacego
             cursor.execute("SELECT email FROM users WHERE user_id = %s", [oceniajacy_id])
             result = cursor.fetchone()
             if result:
                 email = result[0]
 
+            # Dodajemy ocenę do tabeli ratings
             sql_insert = """
                 INSERT INTO ratings (oceniajacy_id, oceniany_id, ocena, data_oceny)
                 VALUES (%s, %s, %s, CURRENT_DATE)
             """
             cursor.execute(sql_insert, [oceniajacy_id, oceniany_id, ocena])
 
+            # Obliczamy średnią ocenę użytkownika
+            cursor.execute("""
+                SELECT AVG(ocena) 
+                FROM ratings 
+                WHERE oceniany_id = %s
+            """, [oceniany_id])
+
+            result = cursor.fetchone()
+            if result and result[0] is not None:
+                average_rating = result[0]
+            else:
+                average_rating = 0
+
+            # Aktualizujemy kolumnę average_rating w tabeli users
+            cursor.execute("""
+                UPDATE users 
+                SET average_rating = %s 
+                WHERE user_id = %s
+            """, [average_rating, oceniany_id])
+
         zapisz_log(email, 'OCENA_SUKCES', f'Oceniono użytkownika {oceniany_id} na {ocena}', ip_address)
-        return JsonResponse({'message': 'Oceniono użytkownika.'}, status=200)
+        return JsonResponse({'message': 'Oceniono użytkownika.', 'average_rating': average_rating}, status=200)
+
     except Exception as e:
         zapisz_log(email, 'OCENA_BŁĄD', f'Błąd: {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)

@@ -7,7 +7,8 @@ CREATE TABLE users (
     is_active BOOLEAN DEFAULT TRUE,
     is_staff BOOLEAN DEFAULT FALSE,
     likes_received_count  INT,
-    comments_received_count  INT
+    comments_received_count  INT,
+    average_rating FLOAT
 );
 
 
@@ -51,7 +52,7 @@ CREATE TABLE comments (
 
 CREATE TABLE likes (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,  -- użytkownik, który daje polubienie
+    user_id INT NOT NULL,
     target_type VARCHAR(10) NOT NULL CHECK (target_type IN ('ad', 'user')),
     ad_id INT NULL,
     target_user_id INT NULL,
