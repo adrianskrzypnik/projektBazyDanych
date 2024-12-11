@@ -32,16 +32,6 @@ CREATE TABLE ads (
 );
 
 CREATE TABLE comments (
-    comment_id INT AUTO_INCREMENT PRIMARY KEY,
-    ogloszenie_id INT,
-    uzytkownik_id INT,
-    tresc TEXT,
-    data_utworzenia DATE,
-    FOREIGN KEY (ogloszenie_id) REFERENCES ads(ad_id),
-    FOREIGN KEY (uzytkownik_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
