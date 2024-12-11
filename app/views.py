@@ -468,15 +468,16 @@ def przegladaj_ogloszenia_test(request):
 
 
 def dodaj_komentarz(request):
+    ip_address = request.META.get('REMOTE_ADDR', '')
     """
     Funkcja dodawania komentarzy z użyciem raw SQL.
     Obsługuje zarówno komentarze do ogłoszeń, jak i do profili użytkowników.
     """
     # Pobranie danych z requesta
-    typ = request.POST.get('type')  # 'ad' lub 'user'
+    typ = request.POST.get('type')
     element_id = request.POST.get('id')  # ID ogłoszenia lub użytkownika
     tresc = request.POST.get('content')  # Treść komentarza
-    uzytkownik_id = request.session.get('user_id')  # ID zalogowanego użytkownika
+    user_id = request.session.get('user_id')  # ID zalogowanego użytkownika
 
     # Walidacja danych
     if not typ or typ not in ['ad', 'user']:
@@ -491,21 +492,20 @@ def dodaj_komentarz(request):
     try:
         with connection.cursor() as cursor:
             # Pobieranie adresu e-mail użytkownika
-            cursor.execute("SELECT email FROM users WHERE user_id = %s", [uzytkownik_id])
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [user_id])
             user_email = cursor.fetchone()[0]
 
-            # Przygotowanie SQL w zależności od typu
             if typ == 'ad':
                 sql = """
-                    INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
-                    VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
-                """
+                        INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
+                        VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
+                    """
             elif typ == 'user':
                 sql = """
-                    INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
-                    VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
-                """
-            params = [tresc, uzytkownik_id, element_id]
+                        INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
+                        VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
+                    """
+            params = [tresc, user_id, element_id]
 
             # Wykonanie zapytania
             cursor.execute(sql, params)
@@ -529,6 +529,7 @@ def dodaj_komentarz_test(request):
 
 
 def edytuj_komentarz(request, comment_id):
+    ip_address = request.META.get('REMOTE_ADDR', '')
     '''
     User moze edytowac tylko swoje komentarze. Admin moze edytowac każdy komentarz. Treść nie może być pusta.
     '''
@@ -579,7 +580,6 @@ def edytuj_komentarz(request, comment_id):
             zapisz_log(email, 'EDYCJA_KOMENTARZA', f'Zaktualizowano komentarz ID: {comment_id}', ip_address)
 
             return JsonResponse({'message': 'Komentarz został zaktualizowany.'}, status=200)
-
         except Exception as e:
             # Zapis loga o błędzie edytowania komentarza
             zapisz_log(email, 'EDYCJA_KOMENTARZA_BŁĄD', f'Błąd edytowania komentarza ID: {comment_id}, {str(e)}', ip_address)
@@ -816,10 +816,16 @@ def ocen_uzytkownika_test(request, oceniany_id):
 @admin_required
 def dezaktywuj_uzytkownika(request, user_id):
     ip_address = request.META.get('REMOTE_ADDR', '')
-    email = request.user.email  # Assuming admin email is in the session or user object
+    email = ''
+    oceniajacy_id = request.session.get('user_id')
 
     try:
         with connection.cursor() as cursor:
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [oceniajacy_id])
+            result = cursor.fetchone()
+            if result:
+                email = result[0]
+
             sql = "UPDATE users SET is_active = 0 WHERE user_id = %s"
             cursor.execute(sql, [user_id])
 
@@ -837,10 +843,16 @@ def dezaktywuj_uzytkownika_test(request, user_id):
 @admin_required
 def aktywuj_uzytkownika(request, user_id):
     ip_address = request.META.get('REMOTE_ADDR', '')
-    email = request.user.email  # Assuming admin email is in the session or user object
+    email = ''
+    oceniajacy_id = request.session.get('user_id')
 
     try:
         with connection.cursor() as cursor:
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [oceniajacy_id])
+            result = cursor.fetchone()
+            if result:
+                email = result[0]
+
             sql = "UPDATE users SET is_active = 1 WHERE user_id = %s"
             cursor.execute(sql, [user_id])
 
@@ -853,52 +865,54 @@ def aktywuj_uzytkownika(request, user_id):
 
 
 def aktywuj_uzytkownika_test(request, user_id):
-    return render(request, 'activate_user.html', {'user_id': user_id})
+    return render(request, 'admin/activate_user.html', {'user_id': user_id})
 
 @admin_required
 def stworz_kategorie(request):
     user_id = request.session.get('user_id')
+    ip_address = request.META.get('REMOTE_ADDR', '')
+    email = ''
+
     try:
         with connection.cursor() as cursor:
-            # Sprawdzenie, czy użytkownik ma uprawnienia administracyjne
-            cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [user_id])
             result = cursor.fetchone()
+            if result:
+                email = result[0]
+    except Exception as e:
+        print(f"Błąd pobierania emaila: {e}")
 
-            if not result:
-                return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
-
-            is_admin = result[0]
-
-            if not is_admin:
-                return JsonResponse({'error': 'Brak uprawnień do tworzenia kategorii.'}, status=403)
-
+    try:
         if request.method == 'POST':
             nazwa = request.POST.get('nazwa')
 
-            # Walidacja, aby nazwa nie była pusta
             if not nazwa or nazwa.strip() == '':
+                zapisz_log(email, 'STWORZ_KATEGORIE_BŁĄD', 'Nazwa kategorii nie może być pusta', ip_address)
                 return JsonResponse({'error': 'Nazwa kategorii nie może być pusta.'}, status=400)
 
             try:
                 with connection.cursor() as cursor:
-                    # Sprawdzenie, czy kategoria już istnieje
                     cursor.execute("SELECT COUNT(*) FROM categories WHERE nazwa = %s", [nazwa])
                     category_exists = cursor.fetchone()[0] > 0
 
                     if category_exists:
+                        zapisz_log(email, 'STWORZ_KATEGORIE_BŁĄD', 'Kategoria o podanej nazwie już istnieje', ip_address)
                         return JsonResponse({'error': 'Kategoria o podanej nazwie już istnieje.'}, status=400)
 
-                    # Jeśli kategoria nie istnieje, dodaj ją do bazy danych
                     sql = "INSERT INTO categories (nazwa) VALUES (%s)"
                     cursor.execute(sql, [nazwa])
 
+                zapisz_log(email, 'STWORZ_KATEGORIE_SUKCES', f'Utworzono kategorię: {nazwa}', ip_address)
                 return JsonResponse({'message': 'Kategoria została pomyślnie utworzona.'}, status=200)
             except Exception as e:
+                zapisz_log(email, 'STWORZ_KATEGORIE_BŁĄD', f'Błąd podczas tworzenia kategorii: {e}', ip_address)
                 return JsonResponse({'error': str(e)}, status=400)
 
-        return render(request, 'stworz_kategorie.html')
+        zapisz_log(email, 'STWORZ_KATEGORIE_BŁĄD', 'Nieprawidłowa metoda HTTP', ip_address)
+        return JsonResponse({'error': str(e)}, status=400)
 
     except Exception as e:
+        zapisz_log(email, 'STWORZ_KATEGORIE_BŁĄD', f'Nieoczekiwany błąd: {e}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -908,43 +922,61 @@ def stworz_kategorie_test(request):
 @admin_required
 def edytuj_kategorie(request, category_id):
     user_id = request.session.get('user_id')
+    ip_address = request.META.get('REMOTE_ADDR', '')
+    email = ''
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [user_id])
+            result = cursor.fetchone()
+            if result:
+                email = result[0]
+    except Exception as e:
+        print(f"Błąd pobierania emaila: {e}")
+
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
             result = cursor.fetchone()
 
             if not result:
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', 'Zalogowany użytkownik nie istnieje', ip_address)
                 return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
 
             is_admin = result[0]
 
             if not is_admin:
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', 'Brak uprawnień do edytowania kategorii', ip_address)
                 return JsonResponse({'error': 'Brak uprawnień do edytowania kategorii.'}, status=403)
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM categories WHERE category_id = %s", [category_id])
+            category_exists = cursor.fetchone()[0] > 0
+
+            if not category_exists:
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', 'Kategoria o podanym ID nie istnieje', ip_address)
+                return JsonResponse({'error': 'Kategoria o podanym ID nie istnieje.'}, status=404)
 
         if request.method == 'POST':
             nowa_nazwa = request.POST.get('nazwa')
 
-            # Walidacja, aby nazwa nie była pusta
             if not nowa_nazwa or nowa_nazwa.strip() == '':
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', 'Nazwa kategorii nie może być pusta', ip_address)
                 return JsonResponse({'error': 'Nazwa kategorii nie może być pusta.'}, status=400)
 
             try:
                 with connection.cursor() as cursor:
                     cursor.execute("UPDATE categories SET nazwa = %s WHERE category_id = %s", [nowa_nazwa, category_id])
 
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT * FROM categories WHERE category_id = %s", [category_id])
-                    category = cursor.fetchone()
-
-                if not category:
-                    return JsonResponse({'error': 'Kategoria nie istnieje.'}, status=404)
-
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_SUKCES', f'Zaktualizowano kategorię ID: {category_id} na nazwę: {nowa_nazwa}', ip_address)
                 return JsonResponse({'message': 'Kategoria została zaktualizowana.'}, status=200)
 
             except Exception as e:
+                zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', f'Błąd podczas edycji kategorii: {e}', ip_address)
                 return JsonResponse({'error': str(e)}, status=400)
 
     except Exception as e:
+        zapisz_log(email, 'EDYTUJ_KATEGORIE_BŁĄD', f'Nieoczekiwany błąd: {e}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
 
 def edytuj_kategorie_test(request, category_id):
@@ -953,17 +985,31 @@ def edytuj_kategorie_test(request, category_id):
 @admin_required
 def usun_kategorie(request, category_id):
     user_id = request.session.get('user_id')
+    ip_address = request.META.get('REMOTE_ADDR', '')
+    email = ''
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT email FROM users WHERE user_id = %s", [user_id])
+            result = cursor.fetchone()
+            if result:
+                email = result[0]
+    except Exception as e:
+        print(f"Błąd pobierania emaila: {e}")
+
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
             result = cursor.fetchone()
 
             if not result:
+                zapisz_log(email, 'USUN_KATEGORIE_BŁĄD', 'Zalogowany użytkownik nie istnieje', ip_address)
                 return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
 
             is_admin = result[0]
 
             if not is_admin:
+                zapisz_log(email, 'USUN_KATEGORIE_BŁĄD', 'Brak uprawnień do usuwania kategorii', ip_address)
                 return JsonResponse({'error': 'Brak uprawnień do usuwania kategorii.'}, status=403)
 
         if request.method == 'POST':
@@ -971,21 +1017,15 @@ def usun_kategorie(request, category_id):
                 with connection.cursor() as cursor:
                     cursor.execute("DELETE FROM categories WHERE category_id = %s", [category_id])
 
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT * FROM categories WHERE category_id = %s", [category_id])
-                    category = cursor.fetchone()
-
-
-
-                if category:
-                    return JsonResponse({'error': 'Nie udało się usunąć kategorii.'}, status=400)
-
+                zapisz_log(email, 'USUN_KATEGORIE_SUKCES', f'Usunięto kategorię ID: {category_id}', ip_address)
                 return JsonResponse({'message': 'Kategoria została usunięta.'}, status=200)
 
             except Exception as e:
+                zapisz_log(email, 'USUN_KATEGORIE_BŁĄD', f'Błąd podczas usuwania kategorii: {e}', ip_address)
                 return JsonResponse({'error': str(e)}, status=400)
 
     except Exception as e:
+        zapisz_log(email, 'USUN_KATEGORIE_BŁĄD', f'Nieoczekiwany błąd: {e}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
 
 

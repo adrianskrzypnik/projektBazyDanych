@@ -22,7 +22,7 @@ urlpatterns = [
     path('add_category/', views.stworz_kategorie, name='add_category'),
     path('edit_category/<int:category_id>/', views.edytuj_kategorie, name='edit_category'),
     path('delete_category/<int:category_id>/', views.usun_kategorie, name='delete_category'),
-    path('show_logs', views.pokaz_logi, name='show_logs'),
+    path('show_logs/', views.pokaz_logi, name='show_logs'),
 
     # html do testowania funkcji
 
