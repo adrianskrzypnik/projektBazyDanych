@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Aktywacja Użytkownika</title>
+</head>
+<body>
+    <h1>Aktywacja Użytkownika</h1>
+    <form method="post" action="/app/activate_user/{{ user_id }}/">
+        {% csrf_token %}
+        <input type="hidden" name="user_id" value="{{ user_id }}">
+
+        <button type="submit">Aktywuj Użytkownika</button>
+    </form>
+</body>
+</html>
