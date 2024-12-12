@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect
 from django.db import connection
 from django.http import JsonResponse
 from datetime import datetime
+from django.db import transaction
 
 from .decorators import admin_required
 from django.contrib.auth.decorators import login_required
@@ -260,15 +261,20 @@ def dodaj_ogloszenie(request):
         """
 
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, [tytul, opis, cena, kategoria_id, user_id, True, data_utworzenia])
+            with transaction.atomic():  # Rozpoczynamy transakcję
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, [tytul, opis, cena, kategoria_id, user_id, True, data_utworzenia])
 
-            zapisz_log(email, 'DODANIE_OGLOSZENIA_SUKCES', f'Dodano ogłoszenie: {tytul}', ip_address)
+                # Zapis loga o udanym dodaniu ogłoszenia
+                zapisz_log(email, 'DODANIE_OGLOSZENIA_SUKCES', f'Dodano ogłoszenie: {tytul}', ip_address)
+
             return JsonResponse({'message': 'Ogłoszenie zostało dodane.'}, status=201)
+
         except Exception as e:
             # Zapis loga o błędzie dodania ogłoszenia
             zapisz_log(email, 'DODANIE_OGLOSZENIA_BŁĄD', f'Błąd dodania ogłoszenia: {str(e)}', ip_address)
             return JsonResponse({'error': str(e)}, status=500)
+
 
 def dodaj_ogloszenie_test(request):
     return render(request, 'add_ad.html')
@@ -277,7 +283,7 @@ def dodaj_ogloszenie_test(request):
 def usun_ogloszenie(request, ad_id):
     '''
     Funkcja usuwania ogłoszeń, user może usuwać tylko swoje ogłoszenia. Admin może usuwać wszystkie ogłoszenia.
-    Przed usunięciem ogłoszenia usuwane są powiązane like oraz komentarze
+    Przed usunięciem ogłoszenia usuwane są powiązane like oraz komentarze.
     '''
     ip_address = request.META.get('REMOTE_ADDR', '')
     email = ''
@@ -300,37 +306,39 @@ def usun_ogloszenie(request, ad_id):
         return JsonResponse({'error': 'Użytkownik niezalogowany.'}, status=401)
 
     try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
-            result = cursor.fetchone()
+        with transaction.atomic():  # Rozpoczynamy transakcję
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [user_id])
+                result = cursor.fetchone()
 
-            if not result:
-                # Zapis loga o nieistniejącym użytkowniku
-                zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Zalogowany użytkownik nie istnieje', ip_address)
-                return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
+                if not result:
+                    # Zapis loga o nieistniejącym użytkowniku
+                    zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Zalogowany użytkownik nie istnieje', ip_address)
+                    return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
 
-            is_admin = result[0]
+                is_admin = result[0]
 
-            cursor.execute("SELECT uzytkownik_id, tytul FROM ads WHERE ad_id = %s", [ad_id])
-            ad_info = cursor.fetchone()
+                cursor.execute("SELECT uzytkownik_id, tytul FROM ads WHERE ad_id = %s", [ad_id])
+                ad_info = cursor.fetchone()
 
-            if not ad_info:
-                # Zapis loga o nieistniejącym ogłoszeniu
-                zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Ogłoszenie nie istnieje', ip_address)
-                return JsonResponse({'error': 'Ogłoszenie nie istnieje.'}, status=404)
+                if not ad_info:
+                    # Zapis loga o nieistniejącym ogłoszeniu
+                    zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Ogłoszenie nie istnieje', ip_address)
+                    return JsonResponse({'error': 'Ogłoszenie nie istnieje.'}, status=404)
 
-            ad_owner, ad_tytul = ad_info
+                ad_owner, ad_tytul = ad_info
 
-            if ad_owner != user_id and not is_admin:
-                # Zapis loga o braku uprawnień
-                zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Brak uprawnień do usunięcia ogłoszenia', ip_address)
-                return JsonResponse({'error': 'Brak uprawnień do usunięcia tego ogłoszenia.'}, status=403)
+                if ad_owner != user_id and not is_admin:
+                    # Zapis loga o braku uprawnień
+                    zapisz_log(email, 'USUWANIE_OGLOSZENIA_BŁĄD', 'Brak uprawnień do usunięcia ogłoszenia', ip_address)
+                    return JsonResponse({'error': 'Brak uprawnień do usunięcia tego ogłoszenia.'}, status=403)
 
-            cursor.execute("DELETE FROM likes WHERE ad_id = %s", [ad_id])
+                # Usunięcie powiązanych polubień i komentarzy
+                cursor.execute("DELETE FROM likes WHERE ad_id = %s", [ad_id])
+                cursor.execute("DELETE FROM comments WHERE ad_id = %s", [ad_id])
 
-            cursor.execute("DELETE FROM comments WHERE ad_id = %s", [ad_id])
-
-            cursor.execute("DELETE FROM ads WHERE ad_id = %s", [ad_id])
+                # Usunięcie ogłoszenia
+                cursor.execute("DELETE FROM ads WHERE ad_id = %s", [ad_id])
 
         # Zapis loga o udanym usunięciu ogłoszenia
         zapisz_log(email, 'USUWANIE_OGLOSZENIA_SUKCES', f'Usunięto ogłoszenie: {ad_tytul}', ip_address)
@@ -342,14 +350,13 @@ def usun_ogloszenie(request, ad_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-
 def usun_ogloszenie_test(request, ad_id):
     return render(request, 'delete_ad.html', {'ad_id': ad_id})
 
 
 def edytuj_ogloszenie(request, ad_id):
     '''
-    User moze edytowac tylko swoje ogloszenia. Admin moze edytkować kazde ogłoszenie.
+    User może edytować tylko swoje ogłoszenia. Admin może edytować każde ogłoszenie.
     '''
     if request.method == 'POST':
         user_id = request.session.get('user_id')
@@ -363,41 +370,48 @@ def edytuj_ogloszenie(request, ad_id):
         status = request.POST.get('status') == 'true'
 
         try:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT is_staff, email FROM users WHERE user_id = %s", [user_id])
-                result = cursor.fetchone()
+            with transaction.atomic():  # Rozpoczynamy transakcję
+                with connection.cursor() as cursor:
+                    # Pobranie informacji o użytkowniku
+                    cursor.execute("SELECT is_staff, email FROM users WHERE user_id = %s", [user_id])
+                    result = cursor.fetchone()
 
-                if not result:
-                    return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
+                    if not result:
+                        return JsonResponse({'error': 'Zalogowany użytkownik nie istnieje.'}, status=404)
 
-                is_admin = result[0]
-                email = result[1]
+                    is_admin = result[0]
+                    email = result[1]
 
-                cursor.execute("SELECT uzytkownik_id FROM ads WHERE ad_id = %s", [ad_id])
-                ad_owner = cursor.fetchone()
+                    # Pobranie właściciela ogłoszenia
+                    cursor.execute("SELECT uzytkownik_id FROM ads WHERE ad_id = %s", [ad_id])
+                    ad_owner = cursor.fetchone()
 
-                if not ad_owner:
-                    return JsonResponse({'error': 'Ogłoszenie nie istnieje.'}, status=404)
+                    if not ad_owner:
+                        return JsonResponse({'error': 'Ogłoszenie nie istnieje.'}, status=404)
 
-                if ad_owner[0] != user_id and not is_admin:
-                    return JsonResponse({'error': 'Brak uprawnień do edytowania tego ogłoszenia.'}, status=403)
+                    # Sprawdzenie uprawnień do edycji ogłoszenia
+                    if ad_owner[0] != user_id and not is_admin:
+                        return JsonResponse({'error': 'Brak uprawnień do edytowania tego ogłoszenia.'}, status=403)
 
-                sql = """
-                UPDATE ads SET tytul = %s, opis = %s, cena = %s, kategoria_id = %s, status = %s
-                WHERE ad_id = %s
-                """
-                cursor.execute(sql, [tytul, opis, cena, kategoria_id, status, ad_id])
+                    # Aktualizacja ogłoszenia
+                    sql = """
+                    UPDATE ads SET tytul = %s, opis = %s, cena = %s, kategoria_id = %s, status = %s
+                    WHERE ad_id = %s
+                    """
+                    cursor.execute(sql, [tytul, opis, cena, kategoria_id, status, ad_id])
 
-            # Zapis loga o edytowaniu ogłoszenia
-            ip_address = request.META.get('REMOTE_ADDR', '')
-            zapisz_log(email, 'EDYCJA_OGŁOSZENIA', f'Zaktualizowano ogłoszenie ID: {ad_id}', ip_address)
+                # Zapis loga o edytowaniu ogłoszenia
+                ip_address = request.META.get('REMOTE_ADDR', '')
+                zapisz_log(email, 'EDYCJA_OGŁOSZENIA', f'Zaktualizowano ogłoszenie ID: {ad_id}', ip_address)
 
             return JsonResponse({'message': 'Ogłoszenie zostało zaktualizowane.'}, status=200)
 
         except Exception as e:
             # Zapis loga o błędzie edytowania ogłoszenia
+            ip_address = request.META.get('REMOTE_ADDR', '')
             zapisz_log(email, 'EDYCJA_OGŁOSZENIA_BŁĄD', f'Błąd edytowania ogłoszenia ID: {ad_id}, {str(e)}', ip_address)
             return JsonResponse({'error': str(e)}, status=500)
+
 
 
 def edytuj_ogloszenie_test(request, ad_id):
@@ -474,11 +488,12 @@ def dodaj_komentarz(request):
         Obsługuje zarówno komentarze do ogłoszeń, jak i do profili użytkowników.
     """
     ip_address = request.META.get('REMOTE_ADDR', '')
-    typ = request.POST.get('type')
-    element_id = request.POST.get('id')
-    tresc = request.POST.get('content')
-    user_id = request.session.get('user_id')
+    typ = request.POST.get('type')  # 'ad' lub 'user'
+    element_id = request.POST.get('id')  # ID ogłoszenia lub użytkownika
+    tresc = request.POST.get('content')  # Treść komentarza
+    user_id = request.session.get('user_id')  # ID zalogowanego użytkownika
 
+    # Walidacja danych wejściowych
     if not typ or typ not in ['ad', 'user']:
         return JsonResponse({'error': 'Pole "type" musi być ustawione na "ad" lub "user".'}, status=400)
     if not element_id:
@@ -487,31 +502,42 @@ def dodaj_komentarz(request):
         return JsonResponse({'error': 'Treść komentarza nie może być pusta.'}, status=400)
 
     try:
-        with connection.cursor() as cursor:
-            if typ == 'ad':
-                sql = """
-                    INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
-                    VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
-                """
-                cursor.execute(sql, [tresc, user_id, element_id])
+        # Rozpoczynamy transakcję
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                if typ == 'ad':
+                    # Dodanie komentarza do ogłoszenia
+                    sql = """
+                        INSERT INTO comments (content, user_id, target_type, ad_id, created_at)
+                        VALUES (%s, %s, 'ad', %s, CURRENT_TIMESTAMP)
+                    """
+                    cursor.execute(sql, [tresc, user_id, element_id])
 
-                cursor.execute("UPDATE ads SET comments_count = comments_count + 1 WHERE ad_id = %s", [element_id])
+                    # Aktualizacja licznika komentarzy w tabeli ads
+                    cursor.execute(
+                        "UPDATE ads SET comments_count = comments_count + 1 WHERE ad_id = %s",
+                        [element_id]
+                    )
 
-            elif typ == 'user':
-                sql = """
-                    INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
-                    VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
-                """
-                cursor.execute(sql, [tresc, user_id, element_id])
+                elif typ == 'user':
+                    # Dodanie komentarza do profilu użytkownika
+                    sql = """
+                        INSERT INTO comments (content, user_id, target_type, target_user_id, created_at)
+                        VALUES (%s, %s, 'user', %s, CURRENT_TIMESTAMP)
+                    """
+                    cursor.execute(sql, [tresc, user_id, element_id])
 
-                # Aktualizacja licznika komentarzy w tabeli użytkowników
-                cursor.execute(
-                    "UPDATE users SET comments_received_count = comments_received_count + 1 WHERE user_id = %s",
-                    [element_id])
+                    # Aktualizacja licznika komentarzy w tabeli users
+                    cursor.execute(
+                        "UPDATE users SET comments_received_count = comments_received_count + 1 WHERE user_id = %s",
+                        [element_id]
+                    )
 
+        # Jeśli wszystko się powiedzie, zwracamy sukces
         return JsonResponse({'message': 'Komentarz został dodany.'}, status=200)
 
     except Exception as e:
+        # W przypadku błędu transakcja zostanie wycofana
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -653,7 +679,8 @@ def usun_komentarz_test(request, comment_id):
 
 def polub(request):
     """
-    Funkcja dodawania polubień dla ogłoszeń i profili użytkowników. DODAJ FUNKCJONALNOSC ABY NIE MOZNA BYLO POLUBIC 2 RAZY TEGO SAMEGO AD LBU USER
+    Funkcja dodawania polubień dla ogłoszeń i profili użytkowników.
+    Obsługuje zabezpieczenie przed wielokrotnym polubieniem tego samego elementu.
     """
     user_id = request.session.get('user_id')
     ip_address = request.META.get('REMOTE_ADDR', '')
@@ -694,7 +721,7 @@ def polub(request):
             INSERT INTO likes (user_id, target_type, ad_id)
             VALUES (%s, 'ad', %s)
         """
-        params = [user_id, element_id]
+        params = [element_id, user_id]
         update_likes_count = "UPDATE ads SET likes_count = likes_count + 1 WHERE ad_id = %s"
     elif typ == 'user':
         sql_check = """
@@ -707,26 +734,33 @@ def polub(request):
             INSERT INTO likes (user_id, target_type, target_user_id)
             VALUES (%s, 'user', %s)
         """
-        params = [user_id, element_id]
+        params = [element_id, user_id]
         update_likes_count = "UPDATE users SET likes_received_count = likes_received_count + 1 WHERE user_id = %s"
 
     try:
-        with connection.cursor() as cursor:
-            cursor.execute(sql_check, params)
-            result = cursor.fetchone()
+        with transaction.atomic():  # Rozpoczynamy transakcję
+            with connection.cursor() as cursor:
+                # Sprawdzenie, czy polubienie już istnieje
+                cursor.execute(sql_check, params)
+                result = cursor.fetchone()
 
-            if result[0] == 0:
-                cursor.execute(sql_insert, params)
-                cursor.execute(update_likes_count, [element_id])
-                zapisz_log(email, 'POLUBIENIE_SUKCES',
-                           f'Polubiono {"ogłoszenie" if typ == "ad" else "profil"} {element_id}', ip_address)
-                return JsonResponse({'message': f'Dodano polubienie {"ogłoszenia" if typ == "ad" else "profilu"}'},
-                                    status=200)
-            else:
-                zapisz_log(email, 'POLUBIENIE_BŁĄD',
-                           f'Polubienie {"ogłoszenia" if typ == "ad" else "profilu"} już istnieje.', ip_address)
-                return JsonResponse(
-                    {'message': f'Polubienie {"ogłoszenia" if typ == "ad" else "profilu"} już istnieje.'}, status=400)
+                if result[0] == 0:
+                    # Dodanie polubienia
+                    cursor.execute(sql_insert, [user_id, element_id])
+
+                    # Aktualizacja licznika polubień
+                    cursor.execute(update_likes_count, [element_id])
+
+                    zapisz_log(email, 'POLUBIENIE_SUKCES',
+                               f'Polubiono {"ogłoszenie" if typ == "ad" else "profil"} {element_id}', ip_address)
+                    return JsonResponse({'message': f'Dodano polubienie {"ogłoszenia" if typ == "ad" else "profilu"}'},
+                                        status=200)
+                else:
+                    zapisz_log(email, 'POLUBIENIE_BŁĄD',
+                               f'Polubienie {"ogłoszenia" if typ == "ad" else "profilu"} już istnieje.', ip_address)
+                    return JsonResponse(
+                        {'message': f'Polubienie {"ogłoszenia" if typ == "ad" else "profilu"} już istnieje.'},
+                        status=400)
 
     except Exception as e:
         zapisz_log(email, 'POLUBIENIE_BŁĄD', f'Błąd: {str(e)}', ip_address)
@@ -818,56 +852,58 @@ def ocen_uzytkownika(request, oceniany_id):
         return JsonResponse({'error': 'Użytkownik niezalogowany.'}, status=401)
 
     try:
-        with connection.cursor() as cursor:
-            # Sprawdzamy email oceniajacego
-            cursor.execute("SELECT email FROM users WHERE user_id = %s", [oceniajacy_id])
-            result = cursor.fetchone()
-            if result:
-                email = result[0]
+        with transaction.atomic():  # Rozpoczyna transakcję
+            with connection.cursor() as cursor:
+                # Sprawdzamy email oceniajacego
+                cursor.execute("SELECT email FROM users WHERE user_id = %s", [oceniajacy_id])
+                result = cursor.fetchone()
+                if result:
+                    email = result[0]
 
-            # Sprawdzamy, czy użytkownik już ocenił ocenianego użytkownika
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM ratings 
-                WHERE oceniajacy_id = %s AND oceniany_id = %s
-            """, [oceniajacy_id, oceniany_id])
+                # Sprawdzamy, czy użytkownik już ocenił ocenianego użytkownika
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM ratings 
+                    WHERE oceniajacy_id = %s AND oceniany_id = %s
+                """, [oceniajacy_id, oceniany_id])
 
-            count_result = cursor.fetchone()
-            if count_result and count_result[0] > 0:
-                zapisz_log(email, 'OCENA_BŁĄD', f'Użytkownik {oceniajacy_id} próbował ponownie ocenić użytkownika {oceniany_id}', ip_address)
-                return JsonResponse({'error': 'Użytkownik może dodać tylko jedną ocenę dla tego samego użytkownika.'}, status=400)
+                count_result = cursor.fetchone()
+                if count_result and count_result[0] > 0:
+                    zapisz_log(email, 'OCENA_BŁĄD', f'Użytkownik {oceniajacy_id} próbował ponownie ocenić użytkownika {oceniany_id}', ip_address)
+                    return JsonResponse({'error': 'Użytkownik może dodać tylko jedną ocenę dla tego samego użytkownika.'}, status=400)
 
-            # Dodajemy ocenę do tabeli ratings
-            sql_insert = """
-                INSERT INTO ratings (oceniajacy_id, oceniany_id, ocena, data_oceny)
-                VALUES (%s, %s, %s, CURRENT_DATE)
-            """
-            cursor.execute(sql_insert, [oceniajacy_id, oceniany_id, ocena])
+                # Dodajemy ocenę do tabeli ratings
+                sql_insert = """
+                    INSERT INTO ratings (oceniajacy_id, oceniany_id, ocena, data_oceny)
+                    VALUES (%s, %s, %s, CURRENT_DATE)
+                """
+                cursor.execute(sql_insert, [oceniajacy_id, oceniany_id, ocena])
 
-            # Obliczamy średnią ocenę użytkownika
-            cursor.execute("""
-                SELECT AVG(ocena) 
-                FROM ratings 
-                WHERE oceniany_id = %s
-            """, [oceniany_id])
+                # Obliczamy średnią ocenę użytkownika
+                cursor.execute("""
+                    SELECT AVG(ocena) 
+                    FROM ratings 
+                    WHERE oceniany_id = %s
+                """, [oceniany_id])
 
-            result = cursor.fetchone()
-            if result and result[0] is not None:
-                average_rating = result[0]
-            else:
-                average_rating = 0
+                result = cursor.fetchone()
+                if result and result[0] is not None:
+                    average_rating = result[0]
+                else:
+                    average_rating = 0
 
-            # Aktualizujemy kolumnę average_rating w tabeli users
-            cursor.execute("""
-                UPDATE users 
-                SET average_rating = %s 
-                WHERE user_id = %s
-            """, [average_rating, oceniany_id])
+                # Aktualizujemy kolumnę average_rating w tabeli users
+                cursor.execute("""
+                    UPDATE users 
+                    SET average_rating = %s 
+                    WHERE user_id = %s
+                """, [average_rating, oceniany_id])
 
         zapisz_log(email, 'OCENA_SUKCES', f'Oceniono użytkownika {oceniany_id} na {ocena}', ip_address)
         return JsonResponse({'message': 'Oceniono użytkownika.', 'average_rating': average_rating}, status=200)
 
     except Exception as e:
+        # W przypadku błędu transakcja zostanie automatycznie wycofana
         zapisz_log(email, 'OCENA_BŁĄD', f'Błąd: {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
 
