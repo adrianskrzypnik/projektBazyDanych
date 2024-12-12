@@ -4,13 +4,37 @@ from django.http import JsonResponse
 from datetime import datetime
 from django.contrib.auth import authenticate, login
 from django.shortcuts import render, redirect
-from django.db import connection
+from django.db import connection, transaction
 from django.http import JsonResponse
 from datetime import datetime
-from django.db import transaction
-
+from django.core.exceptions import ValidationError
 from .decorators import admin_required
 from django.contrib.auth.decorators import login_required
+from django.utils.html import escape
+from django.http import JsonResponse
+
+import re
+
+def validate_positive_float(value, field_name):
+    try:
+        value = float(value)
+        if value < 0:
+            raise ValidationError(f"{field_name} musi być liczbą dodatnią.")
+        return value
+    except ValueError:
+        raise ValidationError(f"{field_name} musi być liczbą.")
+
+def validate_string(value, field_name, max_length=255):
+    if not value or not isinstance(value, str):
+        raise ValidationError(f"{field_name} jest wymagany i musi być tekstem.")
+    if len(value) > max_length:
+        raise ValidationError(f"{field_name} nie może mieć więcej niż {max_length} znaków.")
+    return escape(value)
+
+def validate_integer(value, field_name):
+    if not re.match(r'^\d+$', str(value)):
+        raise ValidationError(f"{field_name} musi być liczbą całkowitą.")
+    return int(value)
 
 
 def zapisz_log(email, action, details, ip_address):
@@ -43,6 +67,24 @@ def zarejestruj_uzytkownika(request):
 
         # Zapis loga o próbie rejestracji
         zapisz_log(email, 'REJESTRACJA_PRÓBA', f'Próba rejestracji użytkownika {nazwa}', ip_address)
+
+        # Walidacja danych wejściowych
+        if not nazwa or not email or not haslo:
+            return JsonResponse({'error': 'Wszystkie pola są wymagane.'}, status=400)
+
+        if len(nazwa) < 3 or len(nazwa) > 50:
+            return JsonResponse({'error': 'Nazwa użytkownika musi mieć od 3 do 50 znaków.'}, status=400)
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({'error': 'Podano nieprawidłowy adres e-mail.'}, status=400)
+
+        if len(haslo) < 8:
+            return JsonResponse({'error': 'Hasło musi mieć co najmniej 8 znaków.'}, status=400)
+
+        if not re.search(r'[A-Za-z]', haslo) or not re.search(r'[0-9]', haslo):
+            return JsonResponse({'error': 'Hasło musi zawierać co najmniej jedną literę i jedną cyfrę.'}, status=400)
 
         check_email_sql = "SELECT COUNT(*) FROM users WHERE email = %s"
         insert_sql = """
@@ -81,7 +123,6 @@ def zarejestruj_uzytkownika_test(request):
     '''
     return render(request, 'register.html')
 
-
 def zaloguj_uzytkownika(request):
     '''
     Funkcja logowania użytkownika
@@ -93,6 +134,14 @@ def zaloguj_uzytkownika(request):
 
         # Zapis loga o próbie logowania
         zapisz_log(email, 'LOGOWANIE_PRÓBA', 'Próba logowania', ip_address)
+
+        # Walidacja danych wejściowych
+        if not email or not haslo:
+            return JsonResponse({'error': 'Email i hasło są wymagane.'}, status=400)
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({'error': 'Nieprawidłowy format adresu email.'}, status=400)
 
         sql = "SELECT * FROM users WHERE email = %s AND haslo = %s"
 
@@ -182,6 +231,18 @@ def edytuj_profil(request, user_id):
         nazwa = request.POST.get('nazwa')
         nowy_email = request.POST.get('email')
 
+        # Walidacja danych wejściowych
+        if not nazwa or not nowy_email:
+            return JsonResponse({'error': 'Nazwa użytkownika i email są wymagane.'}, status=400)
+        if not re.match(r'^[a-zA-Z0-9_]{3,30}$', nazwa):
+            return JsonResponse(
+                {'error': 'Nazwa użytkownika może zawierać tylko litery, cyfry i podkreślenia (3-30 znaków).'},
+                status=400)
+        try:
+            validate_email(nowy_email)
+        except ValidationError:
+            return JsonResponse({'error': 'Nieprawidłowy format adresu email.'}, status=400)
+
         try:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT is_staff FROM users WHERE user_id = %s", [logged_in_user])
@@ -254,6 +315,15 @@ def dodaj_ogloszenie(request):
         kategoria_id = request.POST.get('kategoria_id')
         user_id = request.session.get('user_id')
         data_utworzenia = datetime.now()
+
+        # Walidacja danych wejściowych
+        if not tytul or not opis or not cena or not kategoria_id:
+            return JsonResponse({'error': 'Wszystkie pola są wymagane.'}, status=400)
+        if len(tytul) > 100:
+            return JsonResponse({'error': 'Tytuł ogłoszenia nie może przekraczać 100 znaków.'}, status=400)
+        if not re.match(r'^[0-9]+(\.[0-9]{1,2})?$', cena):
+            return JsonResponse({'error': 'Cena musi być liczbą dodatnią z maksymalnie dwiema cyframi po przecinku.'},
+                                status=400)
 
         sql = """
         INSERT INTO ads (tytul, opis, cena, kategoria_id, uzytkownik_id, status, data_utworzenia)
@@ -363,14 +433,16 @@ def edytuj_ogloszenie(request, ad_id):
         if not user_id:
             return JsonResponse({'error': 'Użytkownik niezalogowany.'}, status=401)
 
-        tytul = request.POST.get('tytul')
-        opis = request.POST.get('opis')
-        cena = request.POST.get('cena')
-        kategoria_id = request.POST.get('kategoria_id')
-        status = request.POST.get('status') == 'true'
-
         try:
-            with transaction.atomic():  # Rozpoczynamy transakcję
+            tytul = validate_string(request.POST.get('tytul'), 'Tytuł')
+            opis = validate_string(request.POST.get('opis'), 'Opis', max_length=1000)
+            cena = validate_positive_float(request.POST.get('cena'), 'Cena')
+            kategoria_id = validate_integer(request.POST.get('kategoria_id'), 'Kategoria ID')
+            status = request.POST.get('status') == 'true'
+
+            ad_id = validate_integer(ad_id, 'ID ogłoszenia')
+
+            with transaction.atomic():
                 with connection.cursor() as cursor:
                     # Pobranie informacji o użytkowniku
                     cursor.execute("SELECT is_staff, email FROM users WHERE user_id = %s", [user_id])
@@ -406,8 +478,9 @@ def edytuj_ogloszenie(request, ad_id):
 
             return JsonResponse({'message': 'Ogłoszenie zostało zaktualizowane.'}, status=200)
 
+        except ValidationError as e:
+            return JsonResponse({'error': str(e)}, status=400)
         except Exception as e:
-            # Zapis loga o błędzie edytowania ogłoszenia
             ip_address = request.META.get('REMOTE_ADDR', '')
             zapisz_log(email, 'EDYCJA_OGŁOSZENIA_BŁĄD', f'Błąd edytowania ogłoszenia ID: {ad_id}, {str(e)}', ip_address)
             return JsonResponse({'error': str(e)}, status=500)
@@ -419,27 +492,32 @@ def edytuj_ogloszenie_test(request, ad_id):
 
 
 def przegladaj_ogloszenia(request):
-    category_id = request.GET.get('category')
-    min_price = request.GET.get('min_price')
-    max_price = request.GET.get('max_price')
-
-    sql = "SELECT * FROM ads WHERE status = True"
-
-    if category_id:
-        sql += f" AND kategoria_id = {category_id}"
-
-    if min_price:
-        sql += f" AND cena >= {min_price}"
-    if max_price:
-        sql += f" AND cena <= {max_price}"
-
     try:
+        category_id = request.GET.get('category')
+        min_price = request.GET.get('min_price')
+        max_price = request.GET.get('max_price')
+
+        sql = "SELECT * FROM ads WHERE status = True"
+
+        if category_id:
+            category_id = validate_integer(category_id, 'Kategoria ID')
+            sql += f" AND kategoria_id = {category_id}"
+
+        if min_price:
+            min_price = validate_positive_float(min_price, 'Minimalna cena')
+            sql += f" AND cena >= {min_price}"
+        if max_price:
+            max_price = validate_positive_float(max_price, 'Maksymalna cena')
+            sql += f" AND cena <= {max_price}"
+
         with connection.cursor() as cursor:
             cursor.execute(sql)
             columns = [col[0] for col in cursor.description]
             ads = [dict(zip(columns, ad)) for ad in cursor.fetchall()]
 
         return JsonResponse({'ads': ads}, status=200)
+    except ValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -580,10 +658,11 @@ def edytuj_komentarz(request, comment_id):
                 """, [comment_id])
                 comment_owner = cursor.fetchone()
 
+
                 if not comment_owner:
                     return JsonResponse({'error': 'Komentarz nie istnieje.'}, status=404)
 
-                if comment_owner[0] != user_id and not is_admin:
+                if comment_owner[0] != user_id:
                     return JsonResponse({'error': 'Brak uprawnień do edytowania tego komentarza.'}, status=403)
 
                 sql = """
@@ -640,8 +719,11 @@ def usun_komentarz(request, comment_id):
             if not comment_owner:
                 return JsonResponse({'error': 'Komentarz nie istnieje.'}, status=404)
 
-            if comment_owner[1] != user_id and not is_admin:  # Sprawdzenie właściciela komentarza
+            if comment_owner[3] != user_id:  # Sprawdzenie właściciela komentarza
                 return JsonResponse({'error': 'Brak uprawnień do usunięcia tego komentarza.'}, status=403)
+
+
+            #SPRAWDZENEI CZY JEST ADMINEM
 
             # Sprawdzanie typu komentarza
             if comment_owner[4] == 'ad':
@@ -765,9 +847,6 @@ def polub(request):
     except Exception as e:
         zapisz_log(email, 'POLUBIENIE_BŁĄD', f'Błąd: {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
-
-
-
 
 
 
