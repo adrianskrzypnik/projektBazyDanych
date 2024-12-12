@@ -825,6 +825,18 @@ def ocen_uzytkownika(request, oceniany_id):
             if result:
                 email = result[0]
 
+            # Sprawdzamy, czy użytkownik już ocenił ocenianego użytkownika
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM ratings 
+                WHERE oceniajacy_id = %s AND oceniany_id = %s
+            """, [oceniajacy_id, oceniany_id])
+
+            count_result = cursor.fetchone()
+            if count_result and count_result[0] > 0:
+                zapisz_log(email, 'OCENA_BŁĄD', f'Użytkownik {oceniajacy_id} próbował ponownie ocenić użytkownika {oceniany_id}', ip_address)
+                return JsonResponse({'error': 'Użytkownik może dodać tylko jedną ocenę dla tego samego użytkownika.'}, status=400)
+
             # Dodajemy ocenę do tabeli ratings
             sql_insert = """
                 INSERT INTO ratings (oceniajacy_id, oceniany_id, ocena, data_oceny)
@@ -858,6 +870,7 @@ def ocen_uzytkownika(request, oceniany_id):
     except Exception as e:
         zapisz_log(email, 'OCENA_BŁĄD', f'Błąd: {str(e)}', ip_address)
         return JsonResponse({'error': str(e)}, status=500)
+
 
 
 def ocen_uzytkownika_test(request, oceniany_id):
