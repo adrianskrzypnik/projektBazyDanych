@@ -3,6 +3,9 @@ import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import AddAdView from '../views/AddAdView.vue'
+import AdView from '../views/AdView.vue'
+import ProfileView from '../views/ProfileView.vue'
+import AdminPanelView from "@/views/AdminPanelView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,6 +30,21 @@ const router = createRouter({
       name: 'add_ad',
       component: AddAdView,
     },
+    {
+      path: '/ad',
+      name: 'ad',
+      component: AdView,
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: AdminPanelView,
+    }
   ],
 })
 

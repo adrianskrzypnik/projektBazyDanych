@@ -5,7 +5,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, nazwa, haslo=None):
+    def create_user(self, email, nazwa, password =None):
         if not email:
             raise ValueError('Użytkownik musi mieć adres email')
 
@@ -13,15 +13,15 @@ class UserManager(BaseUserManager):
             email=self.normalize_email(email),
             nazwa=nazwa
         )
-        user.set_password(haslo)
+        user.set_password(password )
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, nazwa, haslo=None):
+    def create_superuser(self, email, nazwa, password =None):
         user = self.create_user(
             email=email,
             nazwa=nazwa,
-            haslo=haslo
+            password =password
         )
         user.is_admin = True
         user.is_staff = True
@@ -35,8 +35,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     data_utworzenia = models.DateField(auto_now_add=True)
 
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+
+    likes_received_count = models.PositiveIntegerField(default=0)  # Licznik polubień
+    comments_received_count = models.PositiveIntegerField(default=0)  # Licznik komentarzy
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)  # Średnia ocena
+
+    last_login = models.DateTimeField(null=True, blank=True)
+    is_superuser = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nazwa']

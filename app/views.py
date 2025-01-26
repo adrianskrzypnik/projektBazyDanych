@@ -8,12 +8,30 @@ from django.db import connection, transaction
 from django.http import JsonResponse
 from datetime import datetime
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from .decorators import admin_required
 from django.contrib.auth.decorators import login_required
 from django.utils.html import escape
 from django.http import JsonResponse
+from django.contrib.auth import get_user_model
 
 import re
+from datetime import datetime
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.decorators import authentication_classes, permission_classes
+
+from .serializers import AuthTokenObtainPairSerializer
+
+from .models import User
 
 def validate_positive_float(value, field_name):
     try:
@@ -37,21 +55,88 @@ def validate_integer(value, field_name):
     return int(value)
 
 
-def zapisz_log(email, action, details, ip_address):
-    '''
-    Funkcja do zapisu logów w bazie danych
-    '''
-    sql = """
-    INSERT INTO logs (user_email, action, details, ip_address)
-    VALUES (%s, %s, %s, %s)
-    """
 
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, [email, action, details, ip_address])
-    except Exception as e:
-        # W razie niepowodzenia zapisu loga, wydrukuj błąd
-        print(f"Błąd zapisu loga: {e}")
+
+
+@api_view(['GET'])
+def me(request):
+    print(request.user)
+    return JsonResponse({
+        'user_id': request.user.user_id,
+        'nazwa': request.user.nazwa,
+        'email': request.user.email,
+        'is_staff': request.user.is_staff,
+    })
+
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def zaloguj_uzytkownika(request):
+    if request.method == 'POST':
+        email = request.data.get('email')
+        haslo = request.data.get('password')
+        ip_address = request.META.get('REMOTE_ADDR', '')
+
+        # Zapis loga o próbie logowania
+        zapisz_log(email, 'LOGOWANIE_PRÓBA', 'Próba logowania', ip_address)
+
+        # Walidacja danych wejściowych
+        if not email or not haslo:
+            return JsonResponse({'error': 'Email i hasło są wymagane.'}, status=400)
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({'error': 'Nieprawidłowy format adresu email.'}, status=400)
+
+        sql = "SELECT * FROM users WHERE email = %s"
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, [email])
+                user = cursor.fetchone()
+
+                if user:
+                    # Sprawdzamy, czy hasło jest poprawne
+                    if user[3] != haslo:  # Zakładając, że user[3] to hasło w bazie danych (kolumna 'haslo')
+                        return JsonResponse({'error': 'Nieprawidłowe hasło.'}, status=400)
+
+                    # Sprawdzamy, czy użytkownik jest aktywny
+                    if not user[5]:  # Zakładając, że user[5] to pole 'is_active'
+                        return JsonResponse({'error': 'Konto użytkownika jest nieaktywne.'}, status=400)
+
+                    user_instance = User(
+                        user_id = user[0],
+                        nazwa=user[1],
+                        email=user[2],
+                        is_staff=user[6]
+                    )
+
+                    refresh = AuthTokenObtainPairSerializer.get_token(user_instance)
+
+                    access_token = refresh.access_token
+
+                    # Zapis loga o udanym logowaniu
+                    zapisz_log(email, 'LOGOWANIE_SUKCES', 'Użytkownik zalogowany pomyślnie', ip_address)
+
+                    # Zwracamy tokeny w odpowiedzi
+                    return JsonResponse({
+                        'access': str(access_token),
+                        'refresh': str(refresh)
+                    }, status=200)
+
+                # Jeśli użytkownik nie istnieje
+                zapisz_log(email, 'LOGOWANIE_BŁĄD', 'Nieprawidłowy email lub hasło', ip_address)
+                return JsonResponse({'error': 'Nieprawidłowy email lub hasło.'}, status=400)
+
+        except Exception as e:
+            # Zapis loga o błędzie logowania
+            zapisz_log(email, 'LOGOWANIE_BŁĄD', f'Błąd logowania: {str(e)}', ip_address)
+            return JsonResponse({'error': str(e)}, status=500)
+
+
 
 
 def zarejestruj_uzytkownika(request):
@@ -88,7 +173,7 @@ def zarejestruj_uzytkownika(request):
 
         check_email_sql = "SELECT COUNT(*) FROM users WHERE email = %s"
         insert_sql = """
-        INSERT INTO users (nazwa, email, haslo, data_utworzenia)
+        INSERT INTO users (nazwa, email, password, data_utworzenia)
         VALUES (%s, %s, %s, %s)
         """
 
@@ -122,48 +207,6 @@ def zarejestruj_uzytkownika_test(request):
     Funkcja do testownia funkcji api register
     '''
     return render(request, 'register.html')
-
-def zaloguj_uzytkownika(request):
-    '''
-    Funkcja logowania użytkownika
-    '''
-    if request.method == 'POST':
-        email = request.POST.get('email')
-        haslo = request.POST.get('haslo')
-        ip_address = request.META.get('REMOTE_ADDR', '')
-
-        # Zapis loga o próbie logowania
-        zapisz_log(email, 'LOGOWANIE_PRÓBA', 'Próba logowania', ip_address)
-
-        # Walidacja danych wejściowych
-        if not email or not haslo:
-            return JsonResponse({'error': 'Email i hasło są wymagane.'}, status=400)
-        try:
-            validate_email(email)
-        except ValidationError:
-            return JsonResponse({'error': 'Nieprawidłowy format adresu email.'}, status=400)
-
-        sql = "SELECT * FROM users WHERE email = %s AND haslo = %s"
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, [email, haslo])
-                user = cursor.fetchone()
-
-                if user:
-                    request.session['user_id'] = user[0]
-                    # Zapis loga o udanym logowaniu
-                    zapisz_log(email, 'LOGOWANIE_SUKCES', 'Użytkownik zalogowany pomyślnie', ip_address)
-                    return JsonResponse({'message': 'Zalogowano pomyślnie.'}, status=200)
-
-            # Zapis loga o nieudanej próbie logowania
-            zapisz_log(email, 'LOGOWANIE_BŁĄD', 'Nieprawidłowy email lub hasło', ip_address)
-            return JsonResponse({'error': 'Nieprawidłowy email lub hasło.'}, status=400)
-
-        except Exception as e:
-            # Zapis loga o błędzie logowania
-            zapisz_log(email, 'LOGOWANIE_BŁĄD', f'Błąd logowania: {str(e)}', ip_address)
-            return JsonResponse({'error': str(e)}, status=500)
 
 
 
@@ -1229,3 +1272,18 @@ def pokaz_logi(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def zapisz_log(email, action, details, ip_address):
+    '''
+    Funkcja do zapisu logów w bazie danych
+    '''
+    sql = """
+    INSERT INTO logs (user_email, action, details, ip_address)
+    VALUES (%s, %s, %s, %s)
+    """
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [email, action, details, ip_address])
+    except Exception as e:
+        # W razie niepowodzenia zapisu loga, wydrukuj błąd
+        print(f"Błąd zapisu loga: {e}")
