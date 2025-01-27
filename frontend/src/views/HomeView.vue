@@ -15,8 +15,8 @@
             class="w-full p-2 border border-gray-300 rounded"
           >
             <option value="">Wszystkie</option>
-            <option v-for="category in categories" :key="category" :value="category">
-              {{ category }}
+            <option v-for="category in categories" :key="category.id" :value="category.id">
+              {{ category.name }}
             </option>
           </select>
         </div>
@@ -60,16 +60,18 @@
     <!-- Lista ogłoszeń -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
-        v-for="ad in filteredAds"
-        :key="ad.id"
+        v-for="ad in ads"
+        :key="ad.ad_id"
         class="p-4 bg-white rounded shadow-md hover:shadow-lg"
       >
-        <h3 class="text-lg font-semibold text-blue-600 mb-2">{{ ad.title }}</h3>
-        <p class="text-gray-700 mb-2"><strong>Kategoria:</strong> {{ ad.category }}</p>
-        <p class="text-gray-700 mb-4"><strong>Cena:</strong> {{ ad.price }} PLN</p>
-        <p class="text-gray-600 mb-4">{{ ad.description }}</p>
+        <h3 class="text-lg font-semibold text-blue-600 mb-2">{{ ad.tytul }}</h3>
+        <p class="text-gray-700 mb-2"><strong>Cena:</strong> {{ ad.cena }} PLN</p>
+        <p class="text-gray-700 mb-4"><strong>Kategoria:</strong>
+          {{ getCategoryName(ad.kategoria_id) }}
+        </p>
+        <p class="text-gray-600 mb-4">{{ ad.opis }}</p>
         <router-link
-          :to="`/ads/${ad.id}`"
+          :to="`/ad/${ad.ad_id}`"
           class="text-blue-600 hover:underline"
         >
           Zobacz szczegóły
@@ -79,49 +81,68 @@
   </div>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      // Lista ogłoszeń (do zastąpienia danymi z backendu)
-      ads: [
-        { id: 1, title: "Ogłoszenie 1", category: "Elektronika", price: 500, description: "Opis ogłoszenia 1" },
-        { id: 2, title: "Ogłoszenie 2", category: "Meble", price: 200, description: "Opis ogłoszenia 2" },
-        { id: 3, title: "Ogłoszenie 3", category: "Motoryzacja", price: 3000, description: "Opis ogłoszenia 3" },
-        { id: 4, title: "Ogłoszenie 4", category: "Nieruchomości", price: 500000, description: "Opis ogłoszenia 4" },
-      ],
+<script setup>
+import { reactive, ref, onMounted, onBeforeMount } from 'vue';
+import axios from 'axios';
+import { useUserStore } from "@/stores/user.js";
 
-      // Kategorie (do zastąpienia danymi z backendu)
-      categories: ["Elektronika", "Meble", "Motoryzacja", "Nieruchomości"],
+const userStore = useUserStore();
 
-      // Filtry
-      filters: {
-        category: "",
-        priceMin: 0,
-        priceMax: 0,
-      },
-    };
-  },
-  computed: {
-    // Filtrowane ogłoszenia
-    filteredAds() {
-      return this.ads.filter((ad) => {
-        const categoryMatch = !this.filters.category || ad.category === this.filters.category;
-        const priceMinMatch = !this.filters.priceMin || ad.price >= this.filters.priceMin;
-        const priceMaxMatch = !this.filters.priceMax || ad.price <= this.filters.priceMax;
-        return categoryMatch && priceMinMatch && priceMaxMatch;
-      });
-    },
-  },
-  methods: {
-    applyFilters() {
-      // Ewentualna logika dodatkowa dla filtrowania
-      console.log("Filtry zastosowane:", this.filters);
-    },
-  },
+const filters = reactive({
+  category: '',
+  priceMin: null,
+  priceMax: null,
+});
+
+const ads = ref([]);
+const categories = ref([]);
+
+// Funkcja pobierająca kategorie z API
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get('/api/categories/');
+    categories.value = response.data;
+  } catch (error) {
+    console.error('Błąd podczas pobierania kategorii:', error);
+  }
 };
-</script>
 
-<style scoped>
-/* Opcjonalne style */
-</style>
+// Funkcja pobierająca ogłoszenia
+const fetchAds = async () => {
+  try {
+    const requestData = {
+      category: filters.category || null,
+      min_price: filters.priceMin || null,
+      max_price: filters.priceMax || null
+    };
+
+    const response = await axios.get('/api/discover_ads/', {
+      params: requestData
+    });
+
+    if (response.data && response.data.ads) {
+      ads.value = response.data.ads;
+    }
+  } catch (error) {
+    console.error('Błąd podczas ładowania ogłoszeń:', error);
+  }
+};
+
+// Funkcja do znalezienia nazwy kategorii na podstawie kategoria_id
+const getCategoryName = (categoryId) => {
+  const category = categories.value.find(c => c.id === categoryId);
+  return category ? category.name : 'Brak kategorii';
+};
+
+// Funkcja wywoływana po kliknięciu przycisku "Filtruj"
+const applyFilters = async () => {
+  await fetchAds();
+};
+
+// Inicjalizacja komponentu
+onBeforeMount(async () => {
+  await userStore.initStore();
+  await fetchCategories();
+  await fetchAds();
+});
+</script>

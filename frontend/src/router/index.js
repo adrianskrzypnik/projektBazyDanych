@@ -31,8 +31,8 @@ const router = createRouter({
       component: AddAdView,
     },
     {
-      path: '/ad',
-      name: 'ad',
+      path: '/ad/:id',
+      name: 'AdView',
       component: AdView,
     },
     {

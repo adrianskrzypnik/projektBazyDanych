@@ -98,11 +98,11 @@ const submitForm = async () => {
 
   if (errors.value.length === 0) {
     try {
-      console.log(form)
-      const response = await axios.post('/api/login/', form)
-      axios.defaults.headers.common["Authorization"] = "Bearer " + response.data.access
-      const userResponse = await axios.get('/api/me/')
-      userStore.setUserInfo(userResponse.data)
+      const response = await axios.post('/api/login/', form);
+      userStore.setToken(response.data);
+      axios.defaults.headers.common["Authorization"] = "Bearer " + response.data.access;
+      const userResponse = await axios.get('/api/me/');
+      userStore.setUserInfo(userResponse.data);
       router.push('/')
     } catch (error) {
       console.error('Login error:', error)

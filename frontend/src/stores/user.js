@@ -7,7 +7,7 @@ export const useUserStore = defineStore({
         user: {
             isAuthenticated: false,
             user_id: null,
-            nazwa: null,
+            name: null,
             email: null,
             is_staff: false,
             is_active: false,
@@ -45,6 +45,7 @@ export const useUserStore = defineStore({
             this.user.isAuthenticated = true;
             localStorage.setItem('user.access', data.access);
             localStorage.setItem('user.refresh', data.refresh);
+            console.log(this.user)
         },
         removeToken() {
             this.user.isAuthenticated = false;
@@ -57,12 +58,13 @@ export const useUserStore = defineStore({
             localStorage.clear();
         },
         setUserInfo(user) {
+
             this.user.user_id = user.user_id;
-            this.user.name = user.nazwa;
+            this.user.name = user.name;
             this.user.email = user.email;
             this.user.is_staff = user.is_staff;
-            localStorage.setItem('user.id', user.user_id);
-            localStorage.setItem('user.name', user.nazwa);
+            localStorage.setItem('user.user_id', user.user_id);
+            localStorage.setItem('user.name', user.name);
             localStorage.setItem('user.email', user.email);
             localStorage.setItem('user.is_staff', user.is_staff);
         },

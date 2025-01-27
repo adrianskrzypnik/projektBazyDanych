@@ -14,9 +14,10 @@ from django.contrib.auth.decorators import login_required
 from django.utils.html import escape
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
-
+import json
 import re
 from datetime import datetime
+from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -61,9 +62,12 @@ def validate_integer(value, field_name):
 @api_view(['GET'])
 def me(request):
     print(request.user)
+    print(request.user.user_id)
+    print(request.user.nazwa)
+    print(request.user.email)
     return JsonResponse({
         'user_id': request.user.user_id,
-        'nazwa': request.user.nazwa,
+        'name': request.user.nazwa,
         'email': request.user.email,
         'is_staff': request.user.is_staff,
     })
@@ -138,15 +142,50 @@ def zaloguj_uzytkownika(request):
 
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def pobierz_statystyki_profilu(request):
+    """
+    Pobiera statystyki profilu użytkownika (liczba polubień, liczba komentarzy, średnia ocena).
+    """
+    user_id = request.user.user_id
+    try:
+        sql = """
+            SELECT 
+                likes_received_count,
+                comments_received_count,
+                average_rating
+            FROM users
+            WHERE user_id = %s
+        """
+        with connection.cursor() as cursor:
 
+            cursor.execute(sql, [user_id])
+            wynik = cursor.fetchone()
+
+            if wynik:
+                likes, comments, rating = wynik
+                return JsonResponse({
+                    'likes_count': likes or 0,
+                    'comments_count': comments or 0,
+                    'average_rating': rating or 0.0
+                }, status=200)
+            else:
+                return JsonResponse({'error': 'Użytkownik nie istnieje.'}, status=404)
+
+    except Exception as e:
+        return JsonResponse({'error': f'Wystąpił błąd: {str(e)}'}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
 def zarejestruj_uzytkownika(request):
     '''
     Funkcja rejestracji użytkownika ze sprawdzeniem czy podany mail nie jest już wykorzystany
     '''
     if request.method == 'POST':
-        nazwa = request.POST.get('nazwa')
-        email = request.POST.get('email')
-        haslo = request.POST.get('haslo')
+        nazwa = request.data.get('nazwa')
+        email = request.data.get('email')
+        haslo = request.data.get('haslo')
         data_utworzenia = datetime.now()
         ip_address = request.META.get('REMOTE_ADDR', '')
 
@@ -210,8 +249,6 @@ def zarejestruj_uzytkownika_test(request):
 
 
 
-def zaloguj_uzytkownika_test(request):
-    return render(request, 'login.html')
 
 
 def wyloguj_uzytkownika(request):
@@ -248,10 +285,10 @@ def wyloguj_uzytkownika(request):
     return JsonResponse({'error': 'Nieprawidłowa metoda HTTP. Wymagane POST.'}, status=405)
 
 
-def wyloguj_uzytkownika_test(request):
-    return render(request, 'logout.html')
 
 
+@api_view(['POST'])
+@csrf_exempt
 def edytuj_profil(request, user_id):
     '''
     Funkcja służąca do edycji danych użytkownika, zwykł user może zmieniać tylko swoje dane, admin każdego usera.
@@ -270,9 +307,10 @@ def edytuj_profil(request, user_id):
         print(f"Błąd pobierania emaila: {e}")
 
     if request.method == 'POST':
-        logged_in_user = request.session.get('user_id')
-        nazwa = request.POST.get('nazwa')
-        nowy_email = request.POST.get('email')
+        data = json.loads(request.body)
+        logged_in_user = request.user.user_id
+        nazwa = data.get('nazwa')
+        nowy_email = data.get('email')
 
         # Walidacja danych wejściowych
         if not nazwa or not nowy_email:
@@ -333,38 +371,106 @@ def edytuj_profil(request, user_id):
     return JsonResponse({'error': 'Nieprawidłowa metoda HTTP. Wymagane POST.'}, status=405)
 
 
-def edytuj_profil_test(request, user_id):
-    return render(request, 'edit_profile.html', {'user_id': user_id})
+@api_view(['GET'])
+def get_ad_details(request, ad_id):
+    try:
+        # Validate ad_id
+        if not isinstance(ad_id, int) and not ad_id.isdigit():
+            return JsonResponse({'error': 'Invalid ad ID format'}, status=400)
 
+        ad_id = int(ad_id)
 
+        with connection.cursor() as cursor:
+            # Pobierz podstawowe informacje o ogłoszeniu
+            cursor.execute("""
+                SELECT a.ad_id, a.tytul, a.opis, a.cena, a.status, 
+                       a.kategoria_id, c.nazwa as kategoria_nazwa,  -- Zmienione z c.kategoria_nazwa na c.name
+                       a.uzytkownik_id, u.nazwa as autor,
+                       a.likes_count, a.comments_count,
+                       a.data_utworzenia
+                FROM ads a
+                JOIN categories c ON a.kategoria_id = c.category_id
+                JOIN users u ON a.uzytkownik_id = u.user_id
+                WHERE a.ad_id = %s AND a.status = True
+            """, [ad_id])
+
+            columns = [col[0] for col in cursor.description]
+            ad_result = cursor.fetchone()
+
+            if not ad_result:
+                return JsonResponse({'error': 'Ogłoszenie nie istnieje'}, status=404)
+
+            ad_data = dict(zip(columns, ad_result))
+
+            # Pobierz komentarze dla ogłoszenia
+            cursor.execute("""
+                SELECT c.id as comment_id, 
+                       c.content as tresc, 
+                       c.created_at as data_dodania,
+                       u.nazwa as autor,
+                       u.user_id as autor_id
+                FROM comments c
+                JOIN users u ON c.user_id = u.user_id
+                WHERE c.ad_id = %s AND c.target_type = 'ad'
+                ORDER BY c.created_at DESC
+            """, [ad_id])
+
+            columns = [col[0] for col in cursor.description]
+            comments = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            # Przygotuj pełną odpowiedź
+            response_data = {
+                'ad': {
+                    'id': ad_data['ad_id'],
+                    'title': ad_data['tytul'],
+                    'description': ad_data['opis'],
+                    'price': float(ad_data['cena']) if ad_data['cena'] is not None else 0.0,
+                    'category': ad_data['kategoria_nazwa'],
+                    'category_id': ad_data['kategoria_id'],
+                    'author': ad_data['autor'],
+                    'author_id': ad_data['uzytkownik_id'],
+                    'likes_count': ad_data['likes_count'] or 0,
+                    'comments_count': ad_data['comments_count'] or 0,
+                    'created_at': ad_data['data_utworzenia'].strftime('%Y-%m-%d') if ad_data[
+                        'data_utworzenia'] else None
+                },
+                'comments': [{
+                    'id': comment['comment_id'],
+                    'content': comment['tresc'],
+                    'created_at': comment['data_dodania'].strftime('%Y-%m-%d %H:%M:%S'),
+                    'author': comment['autor'],
+                    'author_id': comment['autor_id']
+                } for comment in comments]
+            }
+            print(response_data)
+            return JsonResponse(response_data, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+@api_view(['POST'])
+@csrf_exempt
 def dodaj_ogloszenie(request):
     ip_address = request.META.get('REMOTE_ADDR', '')
-    email = ''
-
-    # Próba pobrania emaila zalogowanego użytkownika
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT email FROM users WHERE user_id = %s", [request.session.get('user_id')])
-            result = cursor.fetchone()
-            if result:
-                email = result[0]
-    except Exception as e:
-        print(f"Błąd pobierania emaila: {e}")
 
     if request.method == 'POST':
-        tytul = request.POST.get('tytul')
-        opis = request.POST.get('opis')
-        cena = request.POST.get('cena')
-        kategoria_id = request.POST.get('kategoria_id')
-        user_id = request.session.get('user_id')
+        tytul = request.data.get('tytul')
+        opis = request.data.get('opis')
+        cena = request.data.get('cena')
+        kategoria_id = request.data.get('kategoria_id')
+        email = request.data.get('email')
+        user_id = request.user.user_id
         data_utworzenia = datetime.now()
 
+        print(request.data.get('tytul'))
+        print(request.data.get('opis'))
+        print(request.data.get('cena'))
+        print(request.data.get('kategoria_id'))
         # Walidacja danych wejściowych
         if not tytul or not opis or not cena or not kategoria_id:
             return JsonResponse({'error': 'Wszystkie pola są wymagane.'}, status=400)
         if len(tytul) > 100:
             return JsonResponse({'error': 'Tytuł ogłoszenia nie może przekraczać 100 znaków.'}, status=400)
-        if not re.match(r'^[0-9]+(\.[0-9]{1,2})?$', cena):
+        if not re.match(r'^[0-9]+(\.[0-9]{1,2})?$', str(cena)):
             return JsonResponse({'error': 'Cena musi być liczbą dodatnią z maksymalnie dwiema cyframi po przecinku.'},
                                 status=400)
 
@@ -388,9 +494,6 @@ def dodaj_ogloszenie(request):
             zapisz_log(email, 'DODANIE_OGLOSZENIA_BŁĄD', f'Błąd dodania ogłoszenia: {str(e)}', ip_address)
             return JsonResponse({'error': str(e)}, status=500)
 
-
-def dodaj_ogloszenie_test(request):
-    return render(request, 'add_ad.html')
 
 
 def usun_ogloszenie(request, ad_id):
@@ -533,34 +636,41 @@ def edytuj_ogloszenie(request, ad_id):
 def edytuj_ogloszenie_test(request, ad_id):
     return render(request, 'edit_ad.html', {'ad_id': ad_id})
 
-
+@api_view(['GET'])
 def przegladaj_ogloszenia(request):
     try:
-        category_id = request.GET.get('category')
+        category_id = request.GET.get('category')  # Changed from request.data to request.GET
         min_price = request.GET.get('min_price')
         max_price = request.GET.get('max_price')
 
-        sql = "SELECT * FROM ads WHERE status = True"
+        sql = "SELECT * FROM ads WHERE status = True"  # Wybór aktywnych ogłoszeń
 
+        # Dodaj filtr po kategorii, jeśli jest podana
         if category_id:
             category_id = validate_integer(category_id, 'Kategoria ID')
             sql += f" AND kategoria_id = {category_id}"
 
+        # Dodaj filtr po minimalnej cenie, jeśli jest podana
         if min_price:
             min_price = validate_positive_float(min_price, 'Minimalna cena')
             sql += f" AND cena >= {min_price}"
+
+        # Dodaj filtr po maksymalnej cenie, jeśli jest podana
         if max_price:
             max_price = validate_positive_float(max_price, 'Maksymalna cena')
             sql += f" AND cena <= {max_price}"
 
+        # Uruchamiamy zapytanie SQL
         with connection.cursor() as cursor:
             cursor.execute(sql)
             columns = [col[0] for col in cursor.description]
             ads = [dict(zip(columns, ad)) for ad in cursor.fetchall()]
 
-        return JsonResponse({'ads': ads}, status=200)
-    except ValidationError as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        # Zwracamy odpowiedź w formacie JSON
+        return JsonResponse({
+            'ads': ads
+        }, status=200)
+
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -602,17 +712,17 @@ def przegladaj_ogloszenia_test(request):
 
 
 
-
+@api_view(['POST'])
 def dodaj_komentarz(request):
     """
         Funkcja dodawania komentarzy z użyciem raw SQL.
         Obsługuje zarówno komentarze do ogłoszeń, jak i do profili użytkowników.
     """
     ip_address = request.META.get('REMOTE_ADDR', '')
-    typ = request.POST.get('type')  # 'ad' lub 'user'
-    element_id = request.POST.get('id')  # ID ogłoszenia lub użytkownika
-    tresc = request.POST.get('content')  # Treść komentarza
-    user_id = request.session.get('user_id')  # ID zalogowanego użytkownika
+    typ = request.data.get('type')  # 'ad' lub 'user'
+    element_id = request.data.get('id')  # ID ogłoszenia lub użytkownika
+    tresc = request.data.get('content')  # Treść komentarza
+    user_id = request.user.user_id  # ID zalogowanego użytkownika
 
     # Walidacja danych wejściowych
     if not typ or typ not in ['ad', 'user']:
@@ -807,7 +917,7 @@ def polub(request):
     Funkcja dodawania polubień dla ogłoszeń i profili użytkowników.
     Obsługuje zabezpieczenie przed wielokrotnym polubieniem tego samego elementu.
     """
-    user_id = request.session.get('user_id')
+    user_id = request.request.user_id
     ip_address = request.META.get('REMOTE_ADDR', '')
 
     if not user_id:
@@ -900,7 +1010,7 @@ def usun_polubienie(request, like_id):
     '''
     User może usuwać tylko swoje polubienia. Admin może usunąć każde polubienie.
     '''
-    user_id = request.session.get('user_id')
+    user_id = request.request.user_id
     ip_address = request.META.get('REMOTE_ADDR', '')
     email = ''
 
@@ -1085,8 +1195,25 @@ def aktywuj_uzytkownika(request, user_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-def aktywuj_uzytkownika_test(request, user_id):
-    return render(request, 'admin/activate_user.html', {'user_id': user_id})
+@api_view(['GET'])
+def pobierz_kategorie(request):
+    """
+    Pobiera listę wszystkich kategorii z bazy danych.
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT category_id, nazwa FROM categories")
+            categories = [
+                {
+                    'id': row[0],
+                    'name': row[1]
+                } for row in cursor.fetchall()
+            ]
+
+        return JsonResponse(categories, safe=False)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @admin_required
 def stworz_kategorie(request):
